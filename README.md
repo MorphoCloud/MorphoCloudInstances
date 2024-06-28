@@ -1,3 +1,6 @@
+<img src="https://raw.githubusercontent.com/MorphoCloud/MorphoCloudInstances/main/MC_Instance_512px.png" alt="SlicerMorph on the cloud">
+
+
 # MorphoCloud On-Demand Instances
 JetStream2 backed virtual machines (compute instances) that provide interactive remote desktop interface with 3D Slicer and SlicerMorph preloaded for 3D digital morphology and morphometrics data processing. 
 

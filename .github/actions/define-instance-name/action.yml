@@ -1,0 +1,23 @@
+name: "Define instance name"
+description: "Define instance name"
+inputs:
+  issue_number:
+    description: "Issue number used to set define the instance name"
+    required: true
+outputs:
+  instance_name:
+    description:
+      "Name of the instance formatted as 'morpho-cloud-portal_instance-NNN'
+      where 'NNN' is the issue number"
+    value: ${{ steps.define.outputs.instance_name }}
+runs:
+  using: "composite"
+  steps:
+    - name: "Define instance name"
+      id: define
+      shell: bash
+      run: |
+        instance_name="morpho-cloud-portal_instance-$ISSUE_NUMBER"
+        echo "instance_name=$instance_name" >> $GITHUB_OUTPUT
+      env:
+        ISSUE_NUMBER: ${{ inputs.issue_number }}

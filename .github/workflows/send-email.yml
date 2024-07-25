@@ -1,0 +1,119 @@
+name: Send Email
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  send-email:
+    runs-on: self-hosted
+    if:
+      ${{ !github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/email') ) }}
+    steps:
+      - name: email command
+        id: email_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/email"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "jcfr,muratmaga"
+
+      - uses: actions/checkout@v4
+
+      - name: Extract fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Check instance exists
+        id: check_instance
+        if: ${{ steps.email_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/check-instance-exists
+        with:
+          instance_name: ${{ steps.define.outputs.instance_name }}
+
+      - name: command results comment (Instance does not exist)
+        if:
+          ${{ steps.email_command.outputs.continue == 'true' &&
+          steps.check_instance.outputs.exists == 'false' }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `email` command failed because **${{ steps.define.outputs.instance_name }}** instance does not exist.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Retrieve metadata
+        id: instance_metadata
+        uses: ./.github/actions/retrieve-metadata
+        with:
+          instance_name: ${{ steps.define.outputs.instance_name }}
+
+      - name: comment (failed to retrieve instance metadata)
+        if: ${{ steps.instance_metadata.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `email` command failed to retrieve metadata for **${{ steps.define.outputs.instance_name }}** instance.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Generate Guacamole Connection URL
+        id: guacamole
+        uses: ./.github/actions/generate-connection-url
+        with:
+          instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
+
+      - name: comment (failed to generate connection URL)
+        if: ${{ steps.guacamole.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `email` command failed to generate connection URL for instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Send mail (completed)
+        id: send_email
+        uses: ./.github/actions/send-email
+        with:
+          to: ${{ steps.extract.outputs.email }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+          connection_url: ${{ steps.guacamole.outputs.connection_url }}
+          instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
+          instance_pwd: ${{ steps.instance_metadata.outputs.instance_pwd }}
+
+      - name: command results comment (success)
+        if: ${{ steps.send_email.outcome == 'success' && success() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ✅
+
+            `email` command successfully completed for **${{ steps.define.outputs.instance_name }}** instance.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

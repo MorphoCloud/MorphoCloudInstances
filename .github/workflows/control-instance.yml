@@ -1,0 +1,205 @@
+name: Control Instance
+
+on:
+  issue_comment:
+    types: [created]
+
+# Permissions needed for reacting to IssueOps commands on issues
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  control:
+    runs-on: self-hosted
+    if:
+      ${{ !github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/unshelve') ||
+      contains(github.event.comment.body, '/shelve') ||
+      contains(github.event.comment.body, '/delete') ) }}
+    steps:
+      - name: unshelve command
+        id: unshelve_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/unshelve"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+
+      - name: shelve command
+        id: shelve_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/shelve"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+
+      - name: delete command
+        id: delete_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/delete"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "jcfr,muratmaga"
+
+      - name: Set command metadata
+        id: command
+        if:
+          ${{ steps.unshelve_command.outputs.continue == 'true' ||
+          steps.shelve_command.outputs.continue == 'true' ||
+          steps.delete_command.outputs.continue == 'true' }}
+        run: |
+          if [[ "$UNSHELVE_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$UNSHELVE_COMMAND_CONTINUE"
+            command_name="unshelve"
+            comment_id="${{ steps.unshelve_command.outputs.comment_id }}"
+            expected_status="ACTIVE"
+          elif [[ "$SHELVE_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$SHELVE_COMMAND_CONTINUE"
+            command_name="shelve"
+            comment_id="${{ steps.shelve_command.outputs.comment_id }}"
+            expected_status="SHELVED_OFFLOADED"
+          elif [[ "$DELETE_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$DELETE_COMMAND_CONTINUE"
+            command_name="delete"
+            comment_id="${{ steps.delete_command.outputs.comment_id }}"
+            expected_status=""
+          else
+            continue="false"
+            command_name=""
+            comment_id=""
+            expected_status=""
+          fi
+          echo "continue=$continue" >> $GITHUB_OUTPUT
+          echo "command_name=$command_name" >> $GITHUB_OUTPUT
+          echo "comment_id=$comment_id" >> $GITHUB_OUTPUT
+          echo "expected_status=$expected_status" >> $GITHUB_OUTPUT
+        env:
+          UNSHELVE_COMMAND_CONTINUE:
+            ${{ steps.unshelve_command.outputs.continue }}
+          SHELVE_COMMAND_CONTINUE: ${{ steps.shelve_command.outputs.continue }}
+          DELETE_COMMAND_CONTINUE: ${{ steps.delete_command.outputs.continue }}
+
+      - uses: actions/checkout@v4
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Check instance exists
+        id: check_instance
+        if: ${{ steps.command.outputs.continue == 'true' }}
+        uses: ./.github/actions/check-instance-exists
+        with:
+          instance_name: ${{ steps.define.outputs.instance_name }}
+
+      - name: command results comment (Instance does not exist)
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.check_instance.outputs.exists == 'false' }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `${{ steps.command.outputs.command_name }}` command failed because **${{ steps.define.outputs.instance_name }}** instance does not exist.
+
+      - name: Execute command
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.check_instance.outputs.exists == 'true' }}
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          OS_CLOUD=BIO180006_IU openstack server $COMMAND_NAME "$INSTANCE_NAME"
+        env:
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+          COMMAND_NAME: ${{ steps.command.outputs.command_name }}
+
+      - name: Poll instance status
+        id: instance_poll
+        if: ${{ steps.command.outputs.expected_status != '' }}
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          echo Polling "$INSTANCE_NAME" status
+
+          max_wait_time=300  # Maximum wait time in seconds (300s -> 5mins)
+          wait_interval=5    # Interval between status checks in seconds
+          total_wait_time=0
+
+          while [ $total_wait_time -lt $max_wait_time ]; do
+
+              status=$(openstack server show $INSTANCE_NAME -f json -c status | \
+                jq -r '.status // "PENDING"')
+
+              echo -n "status [$status]. "
+
+              if [[ "$status" = "$EXPECTED_STATUS" ]]; then
+                  echo "Exiting loop."
+                  break
+              else
+                  echo "Waiting for completion..."
+                  sleep $wait_interval
+                  total_wait_time=$((total_wait_time + wait_interval))
+              fi
+          done
+
+          if [ $total_wait_time -ge $max_wait_time ]; then
+              echo "::error ::Maximum wait time ($max_wait_time seconds) exceeded."
+              exit 1
+          fi
+
+          echo "status=$status" >> $GITHUB_OUTPUT
+        env:
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+          EXPECTED_STATUS: ${{ steps.command.outputs.expected_status }}
+
+      - name: comment (maximum wait time exceeded)
+        if: ${{ steps.instance_poll.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            Maximum wait time for command `${{ steps.command.outputs.command_name }}` command to complete exceeded.
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: command results comment (success)
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.check_instance.outputs.exists == 'true' && success() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ✅
+
+            `${{ steps.command.outputs.command_name }}` command successfully applied to **${{ steps.define.outputs.instance_name }}** instance.
+
+      - name: command results comment (failure)
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.check_instance.outputs.exists == 'true' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `${{ steps.command.outputs.command_name }}` command failed to applied to **${{ steps.define.outputs.instance_name }}** instance.
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

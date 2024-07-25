@@ -1,0 +1,49 @@
+name: "Generate Guacamole Connection URL"
+description: "Generate Guacamole Connection URL"
+inputs:
+  instance_ip:
+    description: "Public IP associated with the instance"
+    required: true
+  # instance_pwd:
+  #   description: "Passphrase associated with the instance"
+  #   required: true
+outputs:
+  connection_url:
+    description: "Guacamole Connection URL"
+    value: ${{ steps.guacamole.outputs.connection_url }}
+runs:
+  using: "composite"
+  steps:
+    - name: Generate Guacamole Connection URL
+      id: guacamole
+      shell: bash
+      run: |
+        # See hard-coded value in exosphere/src/Helpers/Interaction.elm
+        guacamole_port=49528
+
+        # See cloud_configs.js (allocation region is "IU")
+        proxy_hostname=proxy-js2-iu.exosphere.app
+
+        # See "buildProxyUrl" in src/Helpers/Url.elm
+        proxified_instance_ip=${INSTANCE_IP//./-}
+
+        # See "stepServerGuacamoleAuth" in exosphere/src/Orchestration/GoalServer.elm
+        # tokens_url="https://http-$proxified_instance_ip-$guacamole_port.$proxy_hostname/guacamole/api/tokens"
+        # auth_token=$(
+        #   curl -X POST --silent -d "username=exouser&password=$INSTANCE_PWD" $tokens_url | \
+        #   jq -r .authToken
+        # )
+        # echo "::add-mask::$auth_token"
+        #
+        # Since the token expires after a few hours, remove "?token=$auth_token" from "connection_url" and require
+        # the user to explicitly authenticate specifying the username and passphrase.
+
+        # See hard-coded value in exosphere/src/Helpers/Interaction.elm
+        client_id=ZGVza3RvcABjAGRlZmF1bHQ
+
+        connection_url="https://http-$proxified_instance_ip-$guacamole_port.$proxy_hostname/guacamole/#/client/$client_id="
+        echo $connection_url
+        echo "connection_url=$connection_url" >> $GITHUB_OUTPUT
+      env:
+        INSTANCE_IP: ${{ inputs.instance_ip }}
+        # INSTANCE_PWD: ${{ inputs.instance_pwd }}

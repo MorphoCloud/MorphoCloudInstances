@@ -1,0 +1,33 @@
+name: "Check instance exists"
+description: "Check instance exists"
+inputs:
+  instance_name:
+    description: "Name of the instance"
+    required: true
+outputs:
+  exists:
+    description: "Set to 'true' or 'false'"
+    value: ${{ steps.check_instance.outputs.exists }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check instance exists
+      id: check_instance
+      shell: bash
+      run: |
+        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+        source ~/venv/bin/activate
+
+        instance=$(openstack server list -f json | \
+          jq \
+            --arg instance_name "$INSTANCE_NAME" \
+            -c '.[] | select(.Name | contains($instance_name))' | \
+          jq -r '.Name' | tail -1)
+
+        [[ $instance == "$INSTANCE_NAME" ]] && exists="true" || exists="false"
+
+        echo "exists [$exists]"
+        echo "exists=$exists" >> $GITHUB_OUTPUT
+      env:
+        INSTANCE_NAME: ${{ inputs.instance_name }}

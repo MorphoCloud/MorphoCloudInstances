@@ -1,0 +1,31 @@
+name: "Instance Request Labeler"
+on:
+  issues:
+    types:
+      - opened
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract issue fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Add flavor label
+        run: gh issue edit "$NUMBER" --add-label "$LABELS"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          LABELS: flavor:${{ steps.extract.outputs.instance_flavor }}

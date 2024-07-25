@@ -1,0 +1,75 @@
+name: "Instance Request Initial Comments"
+on:
+  issues:
+    types:
+      - opened
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+
+jobs:
+  initial_comments:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect Inputs
+        id: collect_inputs
+        run: |
+          echo "EVENT_NAME [$EVENT_NAME]"
+          if [[ "$EVENT_NAME" == "issues" ]]; then
+            issue_number=${{ github.event.issue.number }}
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            issue_number=${{ github.event.inputs.issue_number }}
+          else
+            echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"
+            exit 1
+          fi
+          echo "issue_number=$issue_number" >> $GITHUB_OUTPUT
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+
+      - uses: actions/checkout@v4
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
+
+      - name: Find Instance Name Comment
+        uses: peter-evans/find-comment@v3
+        id: fc_instance_name
+        with:
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "### Instance Name"
+
+      - name: comment (instance name)
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          comment-id: ${{ steps.fc_instance_name.outputs.comment-id }}
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          body: |
+            ### Instance Name
+
+            `${{ steps.define.outputs.instance_name }}`
+
+            _The instance name is derived from the GitHub issue number using the template `morpho-cloud-portal_instance-NNN`. The instance may also be located in the exosphere interface using this name._
+          edit-mode: replace
+
+      - name: Find Issue Commands Comment
+        uses: peter-evans/find-comment@v3
+        id: fc_commands
+        with:
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "### Supported Issue Commands"
+
+      - name: comment (issue commands)
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          comment-id: ${{ steps.fc_commands.outputs.comment-id }}
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          body-path: "issue-commands.md"
+          edit-mode: replace

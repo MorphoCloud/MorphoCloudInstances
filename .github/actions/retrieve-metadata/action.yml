@@ -1,0 +1,61 @@
+name: "Retrieve metadata"
+description: "Retrieve instance metadata"
+inputs:
+  instance_name:
+    description: "Name of the instance to retrieve metadata from"
+    required: true
+outputs:
+  instance_ip:
+    description: "Public IP associated with the instance"
+    value: ${{ steps.instance_metadata.outputs.instance_ip }}
+  instance_pwd:
+    description: "Passphrase associated with the instance"
+    value: ${{ steps.instance_metadata.outputs.instance_pwd }}
+runs:
+  using: "composite"
+  steps:
+    - name: Retrieve metadata
+      id: instance_metadata
+      shell: bash
+      run: |
+        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+        source ~/venv/bin/activate
+
+        echo Retrieving instance "$INSTANCE_NAME" metadata
+
+        # Get instance IP
+        instance_ip=$(
+          openstack server show $INSTANCE_NAME -c addresses -f json | \
+          jq -r '.addresses.auto_allocated_network[1]'
+        )
+        echo "instance_ip [$instance_ip]"
+        if [[ "$instance_ip" == "null" ]]; then
+          echo "::error ::Failed to retrieve $INSTANCE_NAME IP"
+          exit 1
+        fi
+        echo "instance_ip=$instance_ip" >> $GITHUB_OUTPUT
+
+        # Get instance password
+        instance_pwd=$(
+          openstack server show $INSTANCE_NAME -c tags -f json | \
+          jq -r '.tags[] | select(startswith("exoPw")) | sub("^exoPw:"; "")'
+        )
+        if [[ -z "$instance_pwd" ]]; then
+          # Since 'exoPw' tag may not yet set, attempt to directly retrieve the password using
+          # the openstack endpoint local to the instance.
+          instance_pwd=$(ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            exouser@$instance_ip \
+            'curl --silent http://169.254.169.254/openstack/latest/password')
+        fi
+        if [[ -z "$instance_pwd" ]]; then
+          echo "::error ::Failed to retrieve $INSTANCE_NAME password"
+          exit 1
+        fi
+        echo "::add-mask::$instance_pwd"
+        echo "instance_pwd=$instance_pwd" >> $GITHUB_OUTPUT
+      env:
+        INSTANCE_NAME: ${{ inputs.instance_name }}

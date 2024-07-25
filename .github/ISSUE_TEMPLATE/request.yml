@@ -1,0 +1,50 @@
+name: Request Instance
+description: Issue template to request a cloud instance creation.
+title: "Instance: "
+assignees:
+  - jcfr
+  - muratmaga
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        _Please enter a short description of your project in the title bar above this text. E.g.,: "Instance: 3D analysis of bryozoans"._
+
+  - type: dropdown
+    attributes:
+      label: Cloud Computing Instance Flavor
+      description: Select the type of cloud-computing instance to create.
+      options:
+        - g3.xl - GPU instance (32 CPUs, 125 GB RAM and A100 GPU)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Description
+      description:
+        Briefly describe what your project is, your usage needs and how you will
+        be using the instance. Approval of the request is contingent upon a
+        valid use case in the domain of 3D digital morphology. E.g., "I am PhD
+        candidate in XYZ University working on 3D morphometrics of fossil
+        bryozoans. I have microCT scans of 100s specimens, and would like to use
+        SlicerMorph to segment and extract models"._
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: ORCID
+      description: Your ORCID iD profile.
+      placeholder: 0000-0000-0000-0000
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Email
+      description:
+        Email to use for notifications. Please double check your entry.
+    validations:
+      required: true

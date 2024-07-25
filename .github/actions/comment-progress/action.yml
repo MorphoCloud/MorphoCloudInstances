@@ -1,0 +1,82 @@
+name: "Create or update instance creation progress comment"
+description: "Create or update instance creation progress comment"
+inputs:
+  create_ip:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  create_instance:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  associate_ip:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  setup_instance:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  retrieve_connection_url:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  send_email:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  comment-id:
+    description: "The id of the comment to update."
+outputs:
+  comment-id:
+    description: "The id of the comment to update."
+    value: ${{ steps.couc.outputs.comment-id }}
+runs:
+  using: "composite"
+  steps:
+    - name: Set comment status
+      id: status
+      shell: bash
+      run: |
+        if [[ \
+          "{{ inputs.create_ip }}" == "✅" && \
+          "{{ inputs.create_instance }}" == "✅" && \
+          "{{ inputs.associate_ip }}" == "✅" && \
+          "{{ inputs.setup_instance }}" == "✅" && \
+          "{{ inputs.retrieve_connection_url }}" == "✅" && \
+          "{{ inputs.send_email }}" == "✅" \
+          ]]; then
+          value="✅"
+        else
+          value="⏳"
+        fi
+        echo "value=$value" >> $GITHUB_OUTPUT
+
+    - name: Render template
+      id: template
+      uses: chuhlomin/render-template@v1
+      with:
+        template: .github/instance-creation-progress-template.md
+        vars: |
+          details_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          create_ip: ${{ inputs.create_ip }}
+          create_instance: ${{ inputs.create_instance }}
+          associate_ip: ${{ inputs.associate_ip }}
+          setup_instance: ${{ inputs.setup_instance }}
+          retrieve_connection_url: ${{ inputs.retrieve_connection_url }}
+          send_email: ${{ inputs.send_email }}
+          status: ${{ steps.status.outputs.value }}
+
+    - name: Set comment edit-mode
+      id: edit-mode
+      shell: bash
+      run: |
+        if [[ "{{ inputs.comment-id }}" != "" ]]; then
+          value="replace"
+        else
+          value="append"
+        fi
+        echo "value=$value" >> $GITHUB_OUTPUT
+
+    - name: comment (progress)
+      id: couc
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        comment-id: ${{ inputs.comment-id }}
+        issue-number: ${{ github.event.issue.number }}
+        body: ${{ steps.template.outputs.result }}
+        edit-mode: ${{ steps.edit-mode.outputs.value }}

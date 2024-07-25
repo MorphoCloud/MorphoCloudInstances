@@ -1,0 +1,45 @@
+name: "Send email"
+description: "Send email with instance connection details"
+inputs:
+  to:
+    description: "Recipient of the instance connection details"
+    required: true
+  mail_server_username:
+    description: "mail server username"
+    required: true
+  mail_server_password:
+    description: "mail server password"
+    required: true
+  instance_name:
+    description: "Name of the instance to connect to"
+    required: true
+  connection_url:
+    description: "Guacamole Connection URL"
+    required: true
+  instance_ip:
+    description: "Public IP associated with the instance"
+    required: true
+  instance_pwd:
+    description: "Passphrase associated with the instance"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Send mail
+      uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+      with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        secure: true
+        username: ${{ inputs.mail_server_username }}
+        password: ${{ inputs.mail_server_password }}
+        from: MorphoCloudPortal
+        to: ${{ inputs.to }}
+        subject:
+          "[MorphoCloudPortal] Instance ${{ inputs.instance_name }} created"
+        body: |
+          Instance ${{ inputs.instance_name }} created
+
+          Web connect: ${{ inputs.connection_url }}
+          SSH: ssh exouser@${{ inputs.instance_ip }}
+          Passphrase: ${{ inputs.instance_pwd }}

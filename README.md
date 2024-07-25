@@ -14,7 +14,7 @@ In a nutshell, you:
 
 1. Have a research and/or teaching focus centered on 3D biological structure
    (e.g., 3D morphometrics, or visualization);
-2. Need occassional access to powerful computers with large amount of RAM
+2. Need occasional access to powerful computers with large amount of RAM
    (125GB), cores (32), and optionally with a GPU (A100) to work with large
    datasets;
 3. You have a github account;

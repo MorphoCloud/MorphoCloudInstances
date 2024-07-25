@@ -2,13 +2,17 @@ name: "Define instance name"
 description: "Define instance name"
 inputs:
   issue_number:
-    description: "Issue number used to set define the instance name"
+    description: "Issue number 'NNN' used to set the instance name"
     required: true
+  prefix:
+    description:
+      "Optional string to prepend. If prefix is not empty, output is of the form
+      '<PREFIX>_instance-NNN'."
 outputs:
   instance_name:
     description:
-      "Name of the instance formatted as 'morpho-cloud-portal_instance-NNN'
-      where 'NNN' is the issue number"
+      "Name of the instance formatted as '[<PREFIX>_]instance-NNN' where 'NNN'
+      is the issue number"
     value: ${{ steps.define.outputs.instance_name }}
 runs:
   using: "composite"
@@ -17,7 +21,8 @@ runs:
       id: define
       shell: bash
       run: |
-        instance_name="morpho-cloud-portal_instance-$ISSUE_NUMBER"
+        instance_name="${PREFIX:+${PREFIX}_}instance-$ISSUE_NUMBER"
         echo "instance_name=$instance_name" >> $GITHUB_OUTPUT
       env:
+        PREFIX: ${{ inputs.prefix }}
         ISSUE_NUMBER: ${{ inputs.issue_number }}

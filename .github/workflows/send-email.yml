@@ -35,6 +35,7 @@ jobs:
         id: define
         uses: ./.github/actions/define-instance-name
         with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           issue_number: ${{ github.event.issue.number }}
 
       - name: Check instance exists

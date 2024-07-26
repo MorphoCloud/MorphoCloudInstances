@@ -28,9 +28,11 @@ jobs:
         uses: ./.github/actions/comment-progress
         with:
           create_ip: ⏳
+          create_volume: ""
           create_instance: ""
           associate_ip: ""
           setup_instance: ""
+          attach_volume: ""
           retrieve_connection_url: ""
           send_email: ""
 
@@ -129,9 +131,72 @@ jobs:
         with:
           comment-id: ${{ steps.couc_progress.outputs.comment-id }}
           create_ip: ✅
+          create_volume: ⏳
+          create_instance: ""
+          associate_ip: ""
+          setup_instance: ""
+          attach_volume: ""
+          retrieve_connection_url: ""
+          send_email: ""
+
+      - name: Define volume name
+        id: define_volume_name
+        uses: ./.github/actions/define-volume-name
+        with:
+          issue_number: ${{ github.event.issue.number }}
+          suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
+
+      - name: Check volume exists
+        id: check_volume
+        uses: ./.github/actions/check-volume-exists
+        with:
+          volume_name: ${{ steps.define_volume_name.outputs.volume_name }}
+
+      - name: comment (volume already exists)
+        if: ${{ fromJSON(steps.check_volume.outputs.exists) }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ⚠️
+
+            Volume **${{ steps.define_volume_name.outputs.volume_name }}** already exists.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Create Volume
+        if: ${{ ! fromJSON(steps.check_volume.outputs.exists) }}
+        id: create_volume
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          openstack volume create --size 60 "${VOLUME_NAME}"
+        env:
+          VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
+
+      - name: comment (failed to create volume)
+        if: ${{ steps.create_volume.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to create volume.
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: comment (progress)
+        uses: ./.github/actions/comment-progress
+        with:
+          comment-id: ${{ steps.couc_progress.outputs.comment-id }}
+          create_ip: ✅
+          create_volume: ✅
           create_instance: ⏳
           associate_ip: ""
           setup_instance: ""
+          attach_volume: ""
           retrieve_connection_url: ""
           send_email: ""
 
@@ -193,9 +258,11 @@ jobs:
         with:
           comment-id: ${{ steps.couc_progress.outputs.comment-id }}
           create_ip: ✅
+          create_volume: ✅
           create_instance: ✅
           associate_ip: ⏳
           setup_instance: ""
+          attach_volume: ""
           retrieve_connection_url: ""
           send_email: ""
 
@@ -236,9 +303,11 @@ jobs:
         with:
           comment-id: ${{ steps.couc_progress.outputs.comment-id }}
           create_ip: ✅
+          create_volume: ✅
           create_instance: ✅
           associate_ip: ✅
           setup_instance: ⏳
+          attach_volume: ""
           retrieve_connection_url: ""
           send_email: ""
 
@@ -299,9 +368,67 @@ jobs:
         with:
           comment-id: ${{ steps.couc_progress.outputs.comment-id }}
           create_ip: ✅
+          create_volume: ✅
           create_instance: ✅
           associate_ip: ✅
           setup_instance: ✅
+          attach_volume: ⏳
+          retrieve_connection_url: ""
+          send_email: ""
+
+      - name: Attach Volume
+        id: attach_volume
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          instance_id=$(openstack server list -f json | \
+            jq \
+            --arg instance_name "$INSTANCE_NAME" \
+            -c '.[] | select(.Name == $instance_name)' | \
+            jq -r '.ID' | tail -1)
+          echo "instance_id [$instance_id]"
+
+          volume_id=$(openstack volume list -f json | \
+            jq \
+            --arg volume_name "$VOLUME_NAME" \
+            -c '.[] | select(.Name == $volume_name)' | \
+            jq -r '.ID' | tail -1)
+          echo "volume_id [$volume_id]"
+
+          openstack server set \
+            --property "exoVolumes::$volume_id={\"name\":\"My Data\"}" \
+            $instance_id
+
+          openstack server add volume \
+            $instance_id \
+            $volume_id
+        env:
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+          VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
+
+      - name: comment (failed to attach volume)
+        if: ${{ steps.attach_volume.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to attach volume **${{ steps.define_volume_name.outputs.volume_name }}** to instance **${{ steps.define.outputs.instance_name }}**.
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: comment (progress)
+        uses: ./.github/actions/comment-progress
+        with:
+          comment-id: ${{ steps.couc_progress.outputs.comment-id }}
+          create_ip: ✅
+          create_volume: ✅
+          create_instance: ✅
+          associate_ip: ✅
+          setup_instance: ✅
+          attach_volume: ✅
           retrieve_connection_url: ⏳
           send_email: ""
 
@@ -345,9 +472,11 @@ jobs:
         with:
           comment-id: ${{ steps.couc_progress.outputs.comment-id }}
           create_ip: ✅
+          create_volume: ✅
           create_instance: ✅
           associate_ip: ✅
           setup_instance: ✅
+          attach_volume: ✅
           retrieve_connection_url: ✅
           send_email: ⏳
 
@@ -368,9 +497,11 @@ jobs:
         with:
           comment-id: ${{ steps.couc_progress.outputs.comment-id }}
           create_ip: ✅
+          create_volume: ✅
           create_instance: ✅
           associate_ip: ✅
           setup_instance: ✅
+          attach_volume: ✅
           retrieve_connection_url: ✅
           send_email: ✅
 

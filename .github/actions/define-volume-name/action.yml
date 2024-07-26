@@ -1,0 +1,34 @@
+name: "Define volume name"
+description: "Define volume name"
+inputs:
+  issue_number:
+    description: "Issue number used to set the volume name"
+    required: true
+  suffix:
+    description:
+      "Optional string to append. If suffix is not empty, output is of the form
+      'My-Data-NNN-<SUFFIX>'."
+outputs:
+  volume_name:
+    description:
+      "Name of the volume formatted as 'My-Data-NNN[-<SUFFIX>]' where 'NNN' is
+      the issue number"
+    value: ${{ steps.define.outputs.volume_name }}
+  volume_suffix:
+    description:
+      "If input suffix is not empty, volume suffix is set to '-<SUFFIX>'"
+    value: ${{ steps.define.outputs.volume_suffix }}
+runs:
+  using: "composite"
+  steps:
+    - name: "Define volume name"
+      id: define
+      shell: bash
+      run: |
+        volume_suffix=${SUFFIX:+-${SUFFIX}}
+        volume_name="My-Data-$ISSUE_NUMBER${volume_suffix}"
+        echo "volume_name=$volume_name" >> $GITHUB_OUTPUT
+        echo "volume_suffix=$volume_suffix" >> $GITHUB_OUTPUT
+      env:
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        SUFFIX: ${{ inputs.suffix }}

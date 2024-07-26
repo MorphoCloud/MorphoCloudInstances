@@ -1,0 +1,33 @@
+name: "Check volume exists"
+description: "Check volume exists"
+inputs:
+  volume_name:
+    description: "Name of the volume"
+    required: true
+outputs:
+  exists:
+    description: "Set to 'true' or 'false'"
+    value: ${{ steps.check_volume.outputs.exists }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check volume exists
+      id: check_volume
+      shell: bash
+      run: |
+        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+        source ~/venv/bin/activate
+
+        volume=$(openstack volume list -f json | \
+          jq \
+            --arg volume_name "$VOLUME_NAME" \
+            -c '.[] | select(.Name != null) | select(.Name == $volume_name)' | \
+          jq -r '.Name' | tail -1)
+
+        [[ $volume == "$VOLUME_NAME" ]] && exists="true" || exists="false"
+
+        echo "exists [$exists]"
+        echo "exists=$exists" >> $GITHUB_OUTPUT
+      env:
+        VOLUME_NAME: ${{ inputs.volume_name }}

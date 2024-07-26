@@ -4,6 +4,9 @@ inputs:
   create_ip:
     description: "Template input set to '', ✅ or ⏳"
     required: true
+  create_volume:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
   create_instance:
     description: "Template input set to '', ✅ or ⏳"
     required: true
@@ -11,6 +14,9 @@ inputs:
     description: "Template input set to '', ✅ or ⏳"
     required: true
   setup_instance:
+    description: "Template input set to '', ✅ or ⏳"
+    required: true
+  attach_volume:
     description: "Template input set to '', ✅ or ⏳"
     required: true
   retrieve_connection_url:
@@ -34,9 +40,11 @@ runs:
       run: |
         if [[ \
           "{{ inputs.create_ip }}" == "✅" && \
+          "{{ inputs.create_volume }}" == "✅" && \
           "{{ inputs.create_instance }}" == "✅" && \
           "{{ inputs.associate_ip }}" == "✅" && \
           "{{ inputs.setup_instance }}" == "✅" && \
+          "{{ inputs.attach_volume }}" == "✅" && \
           "{{ inputs.retrieve_connection_url }}" == "✅" && \
           "{{ inputs.send_email }}" == "✅" \
           ]]; then
@@ -54,9 +62,11 @@ runs:
         vars: |
           details_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           create_ip: ${{ inputs.create_ip }}
+          create_volume: ${{ inputs.create_volume }}
           create_instance: ${{ inputs.create_instance }}
           associate_ip: ${{ inputs.associate_ip }}
           setup_instance: ${{ inputs.setup_instance }}
+          attach_volume: ${{ inputs.attach_volume }}
           retrieve_connection_url: ${{ inputs.retrieve_connection_url }}
           send_email: ${{ inputs.send_email }}
           status: ${{ steps.status.outputs.value }}

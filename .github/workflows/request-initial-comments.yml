@@ -56,7 +56,7 @@ jobs:
 
             `${{ steps.define.outputs.instance_name }}`
 
-            _The instance name is derived from the GitHub issue number using the template `morpho-cloud-portal_instance-NNN`. The instance may also be located in the exosphere interface using this name._
+            _The instance name is derived from the GitHub issue number using the template `${{ steps.define.outputs.instance_prefix }}instance-NNN`. The instance may also be located in the exosphere interface using this name._
           edit-mode: replace
 
       - name: Find Issue Commands Comment

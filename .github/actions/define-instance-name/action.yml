@@ -14,6 +14,10 @@ outputs:
       "Name of the instance formatted as '[<PREFIX>_]instance-NNN' where 'NNN'
       is the issue number"
     value: ${{ steps.define.outputs.instance_name }}
+  instance_prefix:
+    description:
+      "If input prefix is not empty, instance prefix is set to '<PREFIX>_'"
+    value: ${{ steps.define.outputs.instance_prefix }}
 runs:
   using: "composite"
   steps:
@@ -21,7 +25,9 @@ runs:
       id: define
       shell: bash
       run: |
-        instance_name="${PREFIX:+${PREFIX}_}instance-$ISSUE_NUMBER"
+        instance_prefix=${PREFIX:+${PREFIX}_}
+        instance_name="${instance_prefix}instance-$ISSUE_NUMBER"
+        echo "instance_prefix=$instance_prefix" >> $GITHUB_OUTPUT
         echo "instance_name=$instance_name" >> $GITHUB_OUTPUT
       env:
         PREFIX: ${{ inputs.prefix }}

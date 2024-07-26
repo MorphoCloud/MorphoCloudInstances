@@ -35,7 +35,7 @@ runcmd:
     # --checkout "{instance-config-mgt-repo-checkout}"
     # -e "{ansible-extra-vars}"
     rm -rf /opt/instance-config-mgt
-    exosphere_sha="5f85d93d58c746856019dce43c8686e1eeadcb36" # morpho-cloud-portal-2024.07.17-78a7e2d93
+    exosphere_sha="f4eabba0d4f738367b72816b949025a48606f448" # morpho-cloud-portal-2024.07.17-78a7e2d93
     ansible-pull \
       --url "https://github.com/jcfr/exosphere.git" \
       --checkout "$exosphere_sha" \

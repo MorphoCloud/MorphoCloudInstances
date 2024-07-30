@@ -1,0 +1,172 @@
+name: Update Issue
+
+on:
+  issue_comment:
+    types: [created]
+
+# Permissions needed for reacting to IssueOps commands on issues
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  update-issue:
+    runs-on: ubuntu-latest
+    if:
+      ${{ !github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/encode_email') ||
+      contains(github.event.comment.body, '/decode_email') ) }}
+    steps:
+      - name: encode_email command
+        id: encode_email_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/encode_email"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+
+      - name: decode_email command
+        id: decode_email_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/decode_email"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+
+      - name: Set command metadata
+        id: command
+        if:
+          ${{ steps.encode_email_command.outputs.continue == 'true' ||
+          steps.decode_email_command.outputs.continue == 'true' }}
+        run: |
+          if [[ "$ENCODE_EMAIL_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$ENCODE_EMAIL_COMMAND_CONTINUE"
+            command_name="encode_email"
+            comment_id="${{ steps.encode_email_command.outputs.comment_id }}"
+          elif [[ "$DECODE_EMAIL_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$DECODE_EMAIL_COMMAND_CONTINUE"
+            command_name="decode_email"
+            comment_id="${{ steps.decode_email_command.outputs.comment_id }}"
+          else
+            continue="false"
+            command_name=""
+            comment_id=""
+          fi
+          echo "continue=$continue" >> $GITHUB_OUTPUT
+          echo "command_name=$command_name" >> $GITHUB_OUTPUT
+          echo "comment_id=$comment_id" >> $GITHUB_OUTPUT
+        env:
+          ENCODE_EMAIL_COMMAND_CONTINUE:
+            ${{ steps.encode_email_command.outputs.continue }}
+          DECODE_EMAIL_COMMAND_CONTINUE:
+            ${{ steps.decode_email_command.outputs.continue }}
+
+      - uses: actions/checkout@v4
+
+      - name: Extract fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
+        run: |
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Encode email
+        id: encode_email
+        if: ${{ steps.encode_email_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "encode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'true' }}
+
+      - name: Decode email
+        id: decode_email
+        if: ${{ steps.decode_email_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+      - name: Set updated email
+        id: set_updated_email
+        if: ${{ steps.command.outputs.continue == 'true' }}
+        run: |
+          updated_email=""
+          if [[ "$ENCODE_EMAIL_COMMAND_CONTINUE" == "true" ]]; then
+            updated_email="$ENCODED_EMAIL"
+          elif [[ "$DECODE_EMAIL_COMMAND_CONTINUE" == "true" ]]; then
+            updated_email="$DECODED_EMAIL"
+          fi
+          echo "updated_email=$updated_email" >> $GITHUB_OUTPUT
+        env:
+          ENCODE_EMAIL_COMMAND_CONTINUE:
+            ${{ steps.encode_email_command.outputs.continue }}
+          ENCODED_EMAIL: ${{ steps.encode_email.outputs.output_string }}
+          DECODE_EMAIL_COMMAND_CONTINUE:
+            ${{ steps.decode_email_command.outputs.continue }}
+          DECODED_EMAIL: ${{ steps.decode_email.outputs.output_string }}
+
+      - name: Update issue body
+        id: update_issue_body
+        if: ${{ steps.command.outputs.continue == 'true' }}
+        shell: bash
+        run: |
+          gh issue view $ISSUE_NUMBER \
+            --repo $GH_REPO \
+            --json body \
+            --jq .body > ./body.md
+
+          # Replace email
+          sed "s#$OLD_EMAIL#$NEW_EMAIL#" ./body.md > ./updated_body.md
+
+          gh issue edit $ISSUE_NUMBER \
+            --repo $GH_REPO \
+            --body-file ./updated_body.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          OLD_EMAIL: ${{ steps.extract.outputs.email }}
+          NEW_EMAIL: ${{ steps.set_updated_email.outputs.updated_email }}
+
+      - name: command results comment (success)
+        if: ${{ steps.command.outputs.continue == 'true' && success() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ✅
+
+            `${{ steps.command.outputs.command_name }}` command successfully applied to this issue.
+
+      - name: command results comment (failure)
+        if: ${{ steps.command.outputs.continue == 'true' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `${{ steps.command.outputs.command_name }}` command failed to be applied to this issue.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

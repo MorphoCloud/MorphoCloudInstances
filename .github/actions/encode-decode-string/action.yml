@@ -1,0 +1,50 @@
+name: "Encode or decode string"
+description: "Encode or decode string"
+inputs:
+  input_string:
+    description: "String to encode or decode"
+    required: true
+  encryption_key:
+    description: "Encryption key used for encoding or decoding"
+    required: true
+  operation:
+    description: Operation to perform 'decode' or 'encode'
+    required: true
+  skip:
+    description: Whether to skip the selected operation.
+    default: "false"
+outputs:
+  output_string:
+    description:
+      "Encoded or decoded string. If skip is true, set to input string."
+    value: ${{ steps.encode_decode.outputs.output_string }}
+runs:
+  using: "composite"
+  steps:
+    - name: "Encode or decode string"
+      id: encode_decode
+      shell: bash
+      run: |
+        if [[ ! $SKIP =~ ^(false|true)$  ]]; then
+          echo "::error ::Invalid skip value '$SKIP'. Supported values are 'true' or 'false'"
+          exit 1
+        fi
+        if [[ ! $OPERATION =~ ^(encode|decode)$  ]]; then
+          echo "::error ::Invalid operation value '$OPERATION'. Supported values are 'encode' or 'decode'"
+          exit 1
+        fi
+        if [[ $SKIP == "false" ]]; then
+          if [[ $OPERATION == "encode" ]]; then
+            output_string=$(echo "$INPUT_STRING" | openssl enc -base64 -e -aes-256-cbc -salt -pass pass:$ENCRYPTION_KEY -pbkdf2)
+          else
+            output_string=$(echo "$INPUT_STRING" | openssl enc -base64 -d -aes-256-cbc -salt -pass pass:$ENCRYPTION_KEY -pbkdf2)
+          fi
+        else
+          output_string=$INPUT_STRING
+        fi
+        echo "output_string=$output_string" >> $GITHUB_OUTPUT
+      env:
+        INPUT_STRING: ${{ inputs.input_string }}
+        ENCRYPTION_KEY: ${{ inputs.encryption_key }}
+        OPERATION: ${{ inputs.operation }}
+        SKIP: ${{ fromJSON(inputs.skip) }}

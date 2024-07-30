@@ -27,11 +27,12 @@ runs:
       id: read_issue_body
       shell: bash
       run: |
-        body=$(gh issue view ${{ inputs.issue_number }} \
+        echo "body<<EOF" >> $GITHUB_OUTPUT
+        gh issue view ${{ inputs.issue_number }} \
           --repo ${{ inputs.repository }} \
-          --json body | \
-          jq '.body')
-        echo "body=$body" >> $GITHUB_OUTPUT
+          --json body \
+          --jq .body >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 
@@ -39,7 +40,7 @@ runs:
       id: parse
       uses: zentered/issue-forms-body-parser@v2.2.0
       with:
-        body: ${{ steps.read_issue_body.output.body }}
+        body: ${{ steps.read_issue_body.outputs.body }}
 
     - name: Display parsed data
       shell: bash

@@ -1,0 +1,125 @@
+name: Validate Request
+
+on:
+  issues:
+    types:
+      - opened
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+
+# Permissions needed for reacting to IssueOps commands on issues
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect Inputs
+        id: collect_inputs
+        run: |
+          echo "EVENT_NAME [$EVENT_NAME]"
+          if [[ "$EVENT_NAME" == "issues" ]]; then
+            issue_number=${{ github.event.issue.number }}
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            issue_number=${{ github.event.inputs.issue_number }}
+          else
+            echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"
+            exit 1
+          fi
+          echo "issue_number=$issue_number" >> $GITHUB_OUTPUT
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+
+      - uses: actions/checkout@v4
+
+      - name: Extract fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
+
+      - name: Check ORCID iD format
+        id: check_orcid_format
+        run: |
+          if [[ "$ORCID" =~ ^([0-9]{4}-){3}[0-9]{3}([0-9]|X)$ ]]; then
+            valid="true"
+            emojii="✅"
+          else
+            valid="false"
+            emojii="❌"
+          fi
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          echo "emojii=$emojii" >> $GITHUB_OUTPUT
+        env:
+          ORCID: ${{ steps.extract.outputs.orcid }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
+        run: |
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+      - name: Check email format
+        id: check_email_format
+        run: |
+          # Adapted from https://gist.github.com/guessi/82a73ee7eb2b1216eb9db17bb8d65dd1
+          email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
+          if [[ "$EMAIL" =~ $email_regex ]]; then
+            valid="true"
+            emojii="✅"
+          else
+            valid="false"
+            emojii="❌"
+          fi
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          echo "emojii=$emojii" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.decode_email.outputs.output_string }}
+
+      - name: command results comment (failure)
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          body: |
+            ### Command Results ❌
+
+            `/validate` command failed.
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: command results comment (status)
+        if: ${{ success() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          body: |
+            ### Validation Results
+
+            | Check           | Status  |
+            | --------------- |:-------:|
+            | ORCID iD format | ${{ steps.check_orcid_format.outputs.emojii }} |
+            | Email format    | ${{ steps.check_email_format.outputs.emojii }} |
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

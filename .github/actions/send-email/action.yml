@@ -36,7 +36,8 @@ runs:
         from: MorphoCloudPortal
         to: ${{ inputs.to }}
         subject:
-          "[MorphoCloudPortal] Instance ${{ inputs.instance_name }} created"
+          "[${{ github.event.repository.name }}] Instance ${{
+          inputs.instance_name }} created"
         body: |
           Instance ${{ inputs.instance_name }} created
 

@@ -1,0 +1,55 @@
+name: "Notify Admins of Instance Request"
+on:
+  issues:
+    types:
+      - opened
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+
+jobs:
+  request_notify_admins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect Inputs
+        id: collect_inputs
+        run: |
+          echo "EVENT_NAME [$EVENT_NAME]"
+          if [[ "$EVENT_NAME" == "issues" ]]; then
+            issue_number=${{ github.event.issue.number }}
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            issue_number=${{ github.event.inputs.issue_number }}
+          else
+            echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"
+            exit 1
+          fi
+          echo "issue_number=$issue_number" >> $GITHUB_OUTPUT
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+
+      - uses: actions/checkout@v4
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
+
+      - name: Send mail (approval requested)
+        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{secrets.MAIL_USERNAME}}
+          password: ${{secrets.MAIL_PASSWORD}}
+          from: ${{ github.event.repository.name }}
+          to: maga@uw.edu,jcfr@kitware.com
+          subject:
+            "[${{ github.event.repository.name }}] Approval requested for
+            Instance ${{ steps.define.outputs.instance_name }}"
+          body: |
+            See https://github.com/${{ github.repository }}/issues/${{ steps.collect_inputs.outputs.issue_number }}

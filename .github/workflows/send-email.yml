@@ -18,8 +18,8 @@ jobs:
           command: "/email"
           reaction: "rocket"
           allowed_contexts: "issue"
-          permissions: "write,maintain,admin"
-          allowlist: "jcfr,muratmaga"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
 
       - uses: actions/checkout@v4
 

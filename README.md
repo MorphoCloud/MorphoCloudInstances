@@ -20,6 +20,9 @@ In a nutshell, you:
 3. You have a github account;
 4. You have an ORCID with a public profile;
 
+## Ready to give a try?
+Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose, click **Get Started** and fill in the issue template.
+
 ### FUNDING ACKNOWLEDGEMENT
 
 MorphoCloud services, including MorphoCloud OnDemand Instances, are supported by

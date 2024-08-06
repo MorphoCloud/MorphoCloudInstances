@@ -4,7 +4,7 @@
 
 Powerful virtual machines (compute instances) that provide interactive remote
 desktop interface with [3D Slicer](https://download.slicer.org) and
-[SlicerMorph](https://github.com/SlicerMorph/SlicerMorph) preloaded for 3D
+[SlicerMorph]([https://github.com/SlicerMorph/SlicerMorph](https://github.com/SlicerMorph/SlicerMorph/blob/master/README.md) preloaded for 3D
 digital morphology and morphometrics data processing.
 
 To get more information about these instances, please review
@@ -14,11 +14,11 @@ In a nutshell, you:
 
 1. Have a research and/or teaching focus centered on 3D biological structure
    (e.g., 3D morphometrics, or visualization);
-2. Need occasional access to powerful computers with large amount of RAM
+2. Need occasional access to powerful computers with large amounts of RAM
    (125GB), cores (32), and optionally with a GPU (A100) to work with large
    datasets;
 3. You have a github account;
-4. You have an ORCID with a public profile;
+4. You have an ORCID with a public profile.
 
 ## Ready to give a try?
 Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose, click **Get Started** and fill in the issue template.

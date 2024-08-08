@@ -4,8 +4,8 @@
 
 Powerful virtual machines (compute instances) that provide interactive remote
 desktop interface with [3D Slicer](https://download.slicer.org) and
-[SlicerMorph]([https://github.com/SlicerMorph/SlicerMorph](https://github.com/SlicerMorph/SlicerMorph/blob/master/README.md) preloaded for 3D
-digital morphology and morphometrics data processing.
+[SlicerMorph]([https://github.com/SlicerMorph/SlicerMorph](https://github.com/SlicerMorph/SlicerMorph/blob/master/README.md)
+preloaded for 3D digital morphology and morphometrics data processing.
 
 To get more information about these instances, please review
 [this document](https://docs.google.com/document/d/1WRds-QWnDK1MnmEhGUPyBgjE9hitiddcElAPWiAYRg4/edit#heading=h.b0yi3m7wlfk8).
@@ -21,7 +21,9 @@ In a nutshell, you:
 4. You have an ORCID with a public profile.
 
 ## Ready to give a try?
-Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose, click **Get Started** and fill in the issue template.
+
+Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
+click **Get Started** and fill in the issue template.
 
 ### FUNDING ACKNOWLEDGEMENT
 

@@ -1,9 +1,6 @@
 name: Request Instance
 description: Issue template to request a cloud instance creation.
 title: "Instance: "
-assignees:
-  - jcfr
-  - muratmaga
 
 body:
   - type: markdown

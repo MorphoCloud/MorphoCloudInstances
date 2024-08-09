@@ -38,9 +38,31 @@ runs:
         subject:
           "[${{ github.event.repository.name }}] Instance ${{
           inputs.instance_name }} created"
-        body: |
-          Instance ${{ inputs.instance_name }} created
+        convert_markdown: true
+        html_body: |
+          Your MorphoCloud instance is up and running:
 
-          Web connect: ${{ inputs.connection_url }}
-          SSH: ssh exouser@${{ inputs.instance_ip }}
-          Passphrase: ${{ inputs.instance_pwd }}
+          * **Graphical User Interface (GUI)**: Use the weblink provided below to access your instance.
+          * **Command Line Access**: Use the SSH information provided below to access your instance
+          from the command line.
+
+          In both cases, username is **exouser** and the passphrase is provided.
+
+          **Important Notes:**
+
+          - Each session is limited to 4h, after which your instance is automatically shelved.
+          - To unshelve an existing instance, use the`/unshelve` command.
+          - To shelve an instance and preserve your allocation, use the `/shelve` command.
+          - To obtain the latest set of access credentials, use the `/email` command.
+
+          If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
+
+          **Connection Methods:**
+
+          - Web connect: ${{ inputs.connection_url }}
+          - SSH: `ssh exouser@${{ inputs.instance_ip }}`
+
+          **Credentials:**
+
+          - Username: **exouser**
+          - Passphrase: `${{ inputs.instance_pwd }}`

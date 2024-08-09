@@ -1,0 +1,45 @@
+name: Update Request Status Label
+on:
+  schedule:
+    # Run every 5 mins
+    - cron: "* * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  update-request-status-label:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update issues
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          instance_prefix=${PREFIX:+${PREFIX}_}
+          instance_basename="${instance_prefix}instance"
+
+          openstack server list --name "^${instance_basename}-\d+" -f json | \
+          jq -r '.[] | [.Name, .Status] | @tsv' | \
+            while IFS=$'\t' read -r instance_name status; do
+              issue_number=${instance_name##*-}
+              status_lowercase=${status,,}
+
+              add_label="status:$status_lowercase"
+
+              remove_labels=$(gh issue view $issue_number --json labels \
+                --jq '[.labels[].name | select(test("^status:")?)] | join(",")')
+
+              echo "Updating issue $issue_number adding label [$add_label] and removing labels [$remove_labels]"
+
+              gh issue edit ${issue_number} --add-label "${add_label}" --remove-label "${remove_labels}"
+            done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}

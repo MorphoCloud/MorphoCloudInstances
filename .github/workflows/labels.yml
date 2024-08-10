@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/labels.yml"
+  workflow_dispatch:
 
 jobs:
   create-labels:
@@ -29,38 +30,24 @@ jobs:
           {"name": "status:reboot", "color": "CFD3D7", "description": "The server is in a soft reboot state. A reboot command was passed to the operating system."},
           {"name": "status:rebuild", "color": "CFD3D7", "description": "The server is currently being rebuilt from an image."},
           {"name": "status:rescue", "color": "CFD3D7", "description": "The server is in rescue mode."},
-          {"name": "status:resize", "color": "CFD3D7", "description": "Server is performing the differential copy of data that changed during its initial copy. Server is down for this stage."},
-          {"name": "status:revert_resize", "color": "CFD3D7", "description": "The resize or migration of a server failed for some reason. The destination server is being cleaned up and the original source server is restarting."},
-          {"name": "status:shelved", "color": "CFD3D7", "description": "The server is in shelved state. Depends on the shelve offload time, the server will be automatically shelved off loaded."},
-          {"name": "status:shelved_offloaded", "color": "CFD3D7", "description": "The shelved server is offloaded (removed from the compute host) and it needs unshelved action to be used again."},
-          {"name": "status:shutoff", "color": "CFD3D7", "description": "The server was powered down by the user, either through the OpenStack Compute API or from within the server."},
-          {"name": "status:soft_deleted", "color": "CFD3D7", "description": "The server is marked as deleted but will remain in the cloud for some configurable amount of time. While soft-deleted, an authorized user can restore the server back to normal state. When the time expires, the server will be deleted permanently."},
+          {"name": "status:resize", "color": "CFD3D7", "description": "Server is performing the differential copy of data that changed during its initial copy."},
+          {"name": "status:revert_resize", "color": "CFD3D7", "description": "The resize or migration of a server failed for some reason."},
+          {"name": "status:shelved", "color": "CFD3D7", "description": "The server is in shelved state."},
+          {"name": "status:shelved_offloaded", "color": "CFD3D7", "description": "The shelved server is offloaded (removed from the compute host)."},
+          {"name": "status:shutoff", "color": "CFD3D7", "description": "The server was powered down by the user, either using OpenStack or from within the server."},
+          {"name": "status:soft_deleted", "color": "CFD3D7", "description": "The server is marked as deleted but will remain in the cloud for some configurable amount of time."},
           {"name": "status:suspended", "color": "CFD3D7", "description": "The server is suspended, either by request or necessity."},
           {"name": "status:unknown", "color": "CFD3D7", "description": "The state of the server is unknown."},
           {"name": "status:verify_resize", "color": "CFD3D7", "description": "System is awaiting confirmation that the server is operational after a move or resize."},
           {"name": "timeout:4hrs", "color": "5319E7", "description": "Duration in hours after which the instance will be stopped"}
         ]
     steps:
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const labels = JSON.parse(process.env.LABELS_JSON);
-            for (const label of labels) {
-              try {
-                await github.rest.issues.createLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  name: label.name,
-                  description: label.description || '',
-                  color: label.color
-                });
-              } catch (error) {
-                // Check if the error is because the label already exists
-                if (error.status === 422) {
-                  console.log(`Label '${label.name}' already exists. Skipping.`);
-                } else {
-                  // Log other errors
-                  console.error(`Error creating label '${label.name}': ${error}`);
-                }
-              }
-            }
+      - name: Create or Update Labels
+        run: |
+          echo $LABELS_JSON | jq -r '.[] | [.name, .color, .description] | @tsv' | \
+            while IFS=$'\t' read -r name color description; do
+              gh label create "${name}" --color "${color}" --description "${description}" --force
+            done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}

@@ -95,11 +95,32 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+      - name: Check if email is encoded
+        id: check_email_encryption
+        run: |
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
       - name: Send mail (completed)
         id: send_email
         uses: ./.github/actions/send-email
         with:
-          to: ${{ steps.extract.outputs.email }}
+          to: ${{ steps.decode_email.outputs.output_string }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}
           instance_name: ${{ steps.define.outputs.instance_name }}

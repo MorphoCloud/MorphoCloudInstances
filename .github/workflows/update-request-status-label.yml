@@ -32,8 +32,11 @@ jobs:
 
               add_label="status:$status_lowercase"
 
-              remove_labels=$(gh issue view $issue_number --json labels \
-                --jq '[.labels[].name | select(test("^status:")?)] | join(",")')
+              remove_labels=$(gh issue view $issue_number --json labels | \
+                jq \
+                  -r \
+                  --arg add_label "$add_label" \
+                  -c '[.labels[].name | select(test("^status:")?) | select(. != $add_label)] | join(",")')
 
               echo "Updating issue $issue_number adding label [$add_label] and removing labels [$remove_labels]"
 

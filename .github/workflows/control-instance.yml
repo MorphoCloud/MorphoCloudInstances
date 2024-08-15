@@ -114,7 +114,41 @@ jobs:
 
             `${{ steps.command.outputs.command_name }}` command failed because **${{ steps.define.outputs.instance_name }}** instance does not exist.
 
+      - name: Check if server action already in progress
+        id: check_task_state
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          task_state=$(openstack server show instance-30 -f json | \
+            jq -r '.["OS-EXT-STS:task_state"]')
+
+          echo "task_state [$task_state]"
+          echo "task_state=$task_state" >> $GITHUB_OUTPUT
+
+          if [[ "$task_state" != "null" ]]; then
+              echo "::error ::Server action already in progress. Task state is '$task_state'."
+              exit 1
+          fi
+        env:
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+      - name: comment (server action already in progress)
+        if: ${{ steps.check_task_state.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `${{ steps.command.outputs.command_name }}` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+            A server action is already in progress. Task state is `${{ steps.check_task_state.outputs.task_state }}`.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: Execute command
+        id: execute_command
         if:
           ${{ steps.command.outputs.continue == 'true' &&
           steps.check_instance.outputs.exists == 'true' }}
@@ -127,6 +161,18 @@ jobs:
         env:
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
           COMMAND_NAME: ${{ steps.command.outputs.command_name }}
+
+      - name: command results comment (failure)
+        if: ${{ steps.execute_command.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `${{ steps.command.outputs.command_name }}` command failed to applied to **${{ steps.define.outputs.instance_name }}** instance.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Poll instance status
         id: instance_poll
@@ -178,6 +224,7 @@ jobs:
             ### Command Results ❌
 
             Maximum wait time for command `${{ steps.command.outputs.command_name }}` command to complete exceeded.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: command results comment (success)
@@ -192,15 +239,4 @@ jobs:
 
             `${{ steps.command.outputs.command_name }}` command successfully applied to **${{ steps.define.outputs.instance_name }}** instance.
 
-      - name: command results comment (failure)
-        if:
-          ${{ steps.command.outputs.continue == 'true' &&
-          steps.check_instance.outputs.exists == 'true' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ### Command Results ❌
-
-            `${{ steps.command.outputs.command_name }}` command failed to applied to **${{ steps.define.outputs.instance_name }}** instance.
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

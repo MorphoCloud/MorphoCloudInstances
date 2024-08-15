@@ -92,6 +92,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Instance **${{ steps.define.outputs.instance_name }}** already created.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: instance already exists (failure)
@@ -135,6 +136,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to create floating IP for **${{ steps.define.outputs.instance_name }}** instance.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
@@ -196,6 +198,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to create volume.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
@@ -262,6 +265,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to create instance **${{ steps.define.outputs.instance_name }}**.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
@@ -307,6 +311,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to associate IP with instance **${{ steps.define.outputs.instance_name }}**.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
@@ -372,6 +377,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Maximum wait time for instance **${{ steps.define.outputs.instance_name }}** setup to complete exceeded.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
@@ -428,6 +434,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to attach volume **${{ steps.define_volume_name.outputs.volume_name }}** to instance **${{ steps.define.outputs.instance_name }}**.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
@@ -458,6 +465,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to retrieve metadata for instance **${{ steps.define.outputs.instance_name }}**.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Generate Guacamole Connection URL
@@ -476,6 +484,7 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to generate connection URL for instance **${{ steps.define.outputs.instance_name }}**.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)

@@ -107,6 +107,7 @@ jobs:
             ### Command Results ❌
 
             `/validate` command failed.
+
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: command results comment (status)

@@ -1,10 +1,10 @@
 <img src="https://raw.githubusercontent.com/MorphoCloud/MorphoCloudInstances/main/MC_Instance_512px.png" alt="SlicerMorph on the cloud">
 
-# MorphoCloud On-Demand Instances
+# MorphoCloud On-Demand Instances: Run SlicerMorph inside a web browser.
 
 Powerful virtual machines (compute instances) that provide interactive remote
 desktop interface with [3D Slicer](https://download.slicer.org) and
-[SlicerMorph]([https://github.com/SlicerMorph/SlicerMorph](https://github.com/SlicerMorph/SlicerMorph/blob/master/README.md)
+[SlicerMorph](https://github.com/SlicerMorph/SlicerMorph/blob/master/README.md)
 preloaded for 3D digital morphology and morphometrics data processing.
 
 To get more information about these instances, please review

@@ -13,6 +13,9 @@ inputs:
   instance_name:
     description: "Name of the instance to connect to"
     required: true
+  instance_issue_number:
+    description: "Reference of the GitHub issue associated with the instance"
+    required: true
   connection_url:
     description: "Guacamole Connection URL"
     required: true
@@ -54,6 +57,7 @@ runs:
           - To unshelve an existing instance, use the`/unshelve` command.
           - To shelve an instance and preserve your allocation, use the `/shelve` command.
           - To obtain the latest set of access credentials, use the `/email` command.
+          - Commands should be added as comments to issue [${{ github.repository }}#${{ inputs.instance_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.instance_issue_number }})
 
           If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
 

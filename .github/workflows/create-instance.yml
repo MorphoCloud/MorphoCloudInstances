@@ -529,6 +529,7 @@ jobs:
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}
           instance_name: ${{ steps.define.outputs.instance_name }}
+          instance_issue_number: ${{ github.event.issue.number }}
           connection_url: ${{ steps.guacamole.outputs.connection_url }}
           instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
           instance_pwd: ${{ steps.instance_metadata.outputs.instance_pwd }}

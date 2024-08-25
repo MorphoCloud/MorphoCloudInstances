@@ -1,0 +1,89 @@
+name: Automatic Instance Shelving
+on:
+  schedule:
+    # Run every 5 mins
+    - cron: "* * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  auto-shelve:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@31c86eb3b33c9b601a1f60f98dcbfd1d70f379b4 # v1.10.3
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Auto Shelve
+        run: |
+          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+          source ~/venv/bin/activate
+
+          instance_prefix=${PREFIX:+${PREFIX}_}
+          instance_basename="${instance_prefix}instance"
+
+          openstack server list --name "^${instance_basename}-\d+" -f json | \
+          jq -r '.[] | [.Name, .Status, ."OS-EXT-STS:task_state"] | @tsv' | \
+            while IFS=$'\t' read -r instance_name status task_state; do
+              echo "instance_name [$instance_name] status [$status] task_state [$task_state]"
+              if [[ "$status" != "ACTIVE" ]]; then
+                # Skip because instance is not active
+                continue
+              fi
+              if [[ "$task_state" != "" ]]; then
+                # Skip because instance status is being updated
+                continue
+              fi
+              # Extract issue number
+              issue_number=${instance_name##*-}
+              echo "issue_number [$issue_number]"
+              # Get instance IP
+              instance_ip=$(
+                openstack server show $instance_name -c addresses -f json | \
+                jq -r '.addresses.auto_allocated_network[1]'
+              )
+              echo "instance_ip [$instance_ip]"
+              if [[ "$instance_ip" == "null" ]]; then
+                echo "::warning ::Failed to retrieve $instance_name IP"
+                continue
+              fi
+              # Retrieve uptime
+              uptime_seconds=$(ssh \
+                -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o LogLevel=ERROR \
+                exouser@$instance_ip \
+                  'cat /proc/uptime | awk  "{print \$1}"')
+              uptime_hours=$(echo "scale=2; $uptime_seconds / 3600" | bc)
+              # Check uptime and define action
+              if $(python3 -c "valid=($uptime_hours > 3.5 and $uptime_hours <= 4.0); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
+                action="notify"
+              elif $(python3 -c "valid=($uptime_hours > 4.0); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
+                action="shelve"
+              else
+                action=""
+              fi
+              echo "instance_name [$instance_name], uptime_hours [$uptime_hours] -> action[$action]"
+              # Perform action
+              if [[ "$action" == "shelve" ]]; then
+                gh workflow run control-instance-from-workflow.yml \
+                  -f issue_number=$issue_number \
+                  -f command_name=shelve
+                gh issue comment $issue_number \
+                  -b "Workflow **control-instance-from-workflow.yml** triggered by **automatic-instance-shelving.yml** for command <tt>shelve</tt><br> \
+                  <br> \
+                  For details, see https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
+              fi
+            done
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}

@@ -1,0 +1,192 @@
+name: "Control Instance"
+description: "Control Instance"
+inputs:
+  issue_number:
+    description: "Issue number"
+    required: true
+  command_name:
+    description:
+      "Name of the command to execute: create, delete, shelve, unshelve"
+    required: true
+  instance_name_prefix:
+    description: "Instance name prefix"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Validate command
+      shell: bash
+      run: |
+        if [[ ! $COMMAND_NAME =~ ^create|delete|shelve|unshelve$ ]]; then
+          echo "::error ::Unknown command name 'COMMAND_NAME'. Valid commands are 'create', 'delete', 'shelve' or 'unshelve'."
+          exit 1
+        fi
+      env:
+        COMMAND_NAME: ${{ inputs.command_name }}
+
+    - name: Set command expected status
+      id: expected_status
+      shell: bash
+      run: |
+        if [[ $COMMAND_NAME == "shelve" ]]; then
+          expected_status="SHELVED_OFFLOADED"
+        elif [[ $COMMAND_NAME == "unshelve" ]]; then
+          expected_status="ACTIVE"
+        elif [[ $COMMAND_NAME == "create" ]]; then
+          expected_status="ACTIVE"
+        elif [[ $COMMAND_NAME == "delete" ]]; then
+          expected_status=""
+        fi
+        echo "expected_status [$expected_status]"
+        echo "value=$expected_status" >> $GITHUB_OUTPUT
+      env:
+        COMMAND_NAME: ${{ inputs.command_name }}
+
+    - name: Define instance name
+      id: define
+      uses: ./.github/actions/define-instance-name
+      with:
+        prefix: ${{ inputs.instance_name_prefix }}
+        issue_number: ${{ inputs.issue_number }}
+
+    - name: Check instance exists
+      id: check_instance
+      uses: ./.github/actions/check-instance-exists
+      with:
+        instance_name: ${{ steps.define.outputs.instance_name }}
+
+    - name: command results comment (Instance does not exist)
+      if: ${{ steps.check_instance.outputs.exists == 'false' }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed because **${{ steps.define.outputs.instance_name }}** instance does not exist.
+
+    - name: Check if server action already in progress
+      id: check_task_state
+      shell: bash
+      run: |
+        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+        source ~/venv/bin/activate
+
+        task_state=$(openstack server show instance-30 -f json | \
+          jq -r '.["OS-EXT-STS:task_state"]')
+
+        echo "task_state [$task_state]"
+        echo "task_state=$task_state" >> $GITHUB_OUTPUT
+
+        if [[ "$task_state" != "null" ]]; then
+            echo "::error ::Server action already in progress. Task state is '$task_state'."
+            exit 1
+        fi
+      env:
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: comment (server action already in progress)
+      if: ${{ steps.check_task_state.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+          A server action is already in progress. Task state is `${{ steps.check_task_state.outputs.task_state }}`.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Execute command
+      id: execute_command
+      if: ${{ steps.check_instance.outputs.exists == 'true' }}
+      shell: bash
+      run: |
+        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+        source ~/venv/bin/activate
+
+        OS_CLOUD=BIO180006_IU openstack server $COMMAND_NAME "$INSTANCE_NAME"
+      env:
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+        COMMAND_NAME: ${{ inputs.command_name }}
+
+    - name: command results comment (failure)
+      if: ${{ steps.execute_command.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to applied to **${{ steps.define.outputs.instance_name }}** instance.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Poll instance status
+      id: instance_poll
+      if: ${{ steps.expected_status.outputs.value != '' }}
+      shell: bash
+      run: |
+        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
+
+        source ~/venv/bin/activate
+
+        echo Polling "$INSTANCE_NAME" status
+
+        max_wait_time=300  # Maximum wait time in seconds (300s -> 5mins)
+        wait_interval=5    # Interval between status checks in seconds
+        total_wait_time=0
+
+        while [ $total_wait_time -lt $max_wait_time ]; do
+
+            status=$(openstack server show $INSTANCE_NAME -f json -c status | \
+              jq -r '.status // "PENDING"')
+
+            echo -n "status [$status]. "
+
+            if [[ "$status" = "$EXPECTED_STATUS" ]]; then
+                echo "Exiting loop."
+                break
+            else
+                echo "Waiting for completion..."
+                sleep $wait_interval
+                total_wait_time=$((total_wait_time + wait_interval))
+            fi
+        done
+
+        if [ $total_wait_time -ge $max_wait_time ]; then
+            echo "::error ::Maximum wait time ($max_wait_time seconds) exceeded."
+            exit 1
+        fi
+
+        echo "status=$status" >> $GITHUB_OUTPUT
+      env:
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+        EXPECTED_STATUS: ${{ steps.expected_status.outputs.value }}
+
+    - name: comment (maximum wait time exceeded)
+      if: ${{ steps.instance_poll.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          Maximum wait time for command `${{ inputs.command_name }}` command to complete exceeded.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: command results comment (success)
+      if: ${{ steps.check_instance.outputs.exists == 'true' && success() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ✅
+
+          `${{ inputs.command_name }}` command successfully applied to **${{ steps.define.outputs.instance_name }}** instance.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

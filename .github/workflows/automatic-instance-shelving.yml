@@ -34,34 +34,51 @@ jobs:
           jq -r '.[] | [.Name, .Status, ."OS-EXT-STS:task_state"] | @tsv' | \
             while IFS=$'\t' read -r instance_name status task_state; do
               echo "instance_name [$instance_name] status [$status] task_state [$task_state]"
+
+              # Skip the instance if it is not active
               if [[ "$status" != "ACTIVE" ]]; then
-                # Skip because instance is not active
                 continue
               fi
+
+              # Skip the instance if it is currently undergoing a status update
               if [[ "$task_state" != "" ]]; then
-                # Skip because instance status is being updated
                 continue
               fi
-              # Extract issue number
+
+              # Extract the issue number from the instance name
               issue_number=${instance_name##*-}
               echo "issue_number [$issue_number]"
-              # Get instance IP
+
+              # Retrieve the IP address of the instance
               instance_ip=$(
                 openstack server show $instance_name -c addresses -f json | \
                 jq -r '.addresses.auto_allocated_network[1]'
               )
               echo "instance_ip [$instance_ip]"
+
+              # Skip the instance if the IP address could not be retrieved
               if [[ "$instance_ip" == "null" ]]; then
                 echo "::warning ::Failed to retrieve $instance_name IP"
                 continue
               fi
-              # Retrieve uptime
+
+              # Notes on SSH usage:
+              # * Redirecting SSH standard input to /dev/null ('< /dev/null') is required to work around
+              #   an issue where SSH breaks out of the while loop in Bash.
+              #   Reference: https://stackoverflow.com/questions/9393038/ssh-breaks-out-of-while-loop-in-bash
+
+              # Retrieve the instance uptime using SSH
               uptime_seconds=$(ssh \
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o LogLevel=ERROR \
                 exouser@$instance_ip \
-                  'cat /proc/uptime | awk  "{print \$1}"')
+                  'cat /proc/uptime | awk  "{print \$1}"' < /dev/null)
+              if [[ $? -ne 0 ]]; then
+                echo "::warning ::Failed to retrieve uptime for $instance_name using IP $instance_ip"
+                continue
+              fi
+              # Convert uptime from seconds to hours
               uptime_hours=$(echo "scale=2; $uptime_seconds / 3600" | bc)
               # Check uptime and define action
               if $(python3 -c "valid=($uptime_hours > 3.5 and $uptime_hours <= 4.0); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then

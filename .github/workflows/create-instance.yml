@@ -349,7 +349,7 @@ jobs:
 
               echo -n "setup status [$status]. "
 
-              if [[ "$status" = "complete" ]]; then
+              if [[ "$status" == "complete" ]]; then
                   echo "Exiting loop."
                   break
               else

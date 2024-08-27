@@ -134,9 +134,13 @@ runs:
 
         source ~/venv/bin/activate
 
-        echo Polling "$INSTANCE_NAME" status
-
         max_wait_time=300  # Maximum wait time in seconds (300s -> 5mins)
+        if [[ "$EXPECTED_STATUS" == "SHELVED_OFFLOADED" ]]; then
+          max_wait_time=600  # Maximum wait time in seconds (600s -> 10mins)
+        fi
+
+        echo "Polling '$INSTANCE_NAME' status [max_wait_time=${max_wait_time}s]"
+
         wait_interval=5    # Interval between status checks in seconds
         total_wait_time=0
 
@@ -147,7 +151,7 @@ runs:
 
             echo -n "status [$status]. "
 
-            if [[ "$status" = "$EXPECTED_STATUS" ]]; then
+            if [[ "$status" == "$EXPECTED_STATUS" ]]; then
                 echo "Exiting loop."
                 break
             else

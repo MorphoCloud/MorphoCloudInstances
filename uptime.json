@@ -2,7 +2,14 @@
   "allocations": [
     {
       "id": "BIO180006_IU",
-      "instances": []
+      "instances": [
+        {
+          "name": "instance-37",
+          "uptimes": {
+            "2024-08-27 05:43:05": 21.55
+          }
+        }
+      ]
     }
   ]
 }

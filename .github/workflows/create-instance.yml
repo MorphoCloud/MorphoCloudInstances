@@ -415,7 +415,7 @@ jobs:
           echo "volume_id [$volume_id]"
 
           openstack server set \
-            --property "exoVolumes::$volume_id={\"name\":\"My Data\"}" \
+            --property "exoVolumes::$volume_id={\"name\":\"MyData\"}" \
             $instance_id
 
           openstack server add volume \

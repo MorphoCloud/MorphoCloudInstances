@@ -47,6 +47,7 @@ jobs:
       - name: Control instance
         uses: ./.github/actions/control-instance
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           issue_number: ${{ inputs.issue_number }}
           command_name: ${{ inputs.command_name }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}

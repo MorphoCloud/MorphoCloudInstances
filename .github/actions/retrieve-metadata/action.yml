@@ -1,6 +1,11 @@
 name: "Retrieve metadata"
 description: "Retrieve instance metadata"
 inputs:
+  os_cloud:
+    description:
+      "Name of the OpenStack cloud allocation to select openstack auth settings
+      defined in '.config/openstack/clouds.yaml'"
+    required: true
   instance_name:
     description: "Name of the instance to retrieve metadata from"
     required: true
@@ -18,8 +23,6 @@ runs:
       id: instance_metadata
       shell: bash
       run: |
-        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
         source ~/venv/bin/activate
 
         echo Retrieving instance "$INSTANCE_NAME" metadata
@@ -58,4 +61,5 @@ runs:
         echo "::add-mask::$instance_pwd"
         echo "instance_pwd=$instance_pwd" >> $GITHUB_OUTPUT
       env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ inputs.instance_name }}

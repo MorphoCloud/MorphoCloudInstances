@@ -25,7 +25,9 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "read,triage,write,maintain,admin"
-          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - name: decode_email command
         id: decode_email_command
@@ -35,7 +37,9 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "read,triage,write,maintain,admin"
-          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - name: Set command metadata
         id: command

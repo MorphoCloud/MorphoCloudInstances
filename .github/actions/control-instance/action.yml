@@ -1,6 +1,11 @@
 name: "Control Instance"
 description: "Control Instance"
 inputs:
+  os_cloud:
+    description:
+      "Name of the OpenStack cloud allocation to select openstack auth settings
+      defined in '.config/openstack/clouds.yaml'"
+    required: true
   issue_number:
     description: "Issue number"
     required: true
@@ -53,6 +58,7 @@ runs:
       id: check_instance
       uses: ./.github/actions/check-instance-exists
       with:
+        os_cloud: ${{ inputs.os_cloud }}
         instance_name: ${{ steps.define.outputs.instance_name }}
 
     - name: command results comment (Instance does not exist)
@@ -69,8 +75,6 @@ runs:
       id: check_task_state
       shell: bash
       run: |
-        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
         source ~/venv/bin/activate
 
         task_state=$(openstack server show instance-30 -f json | \
@@ -84,6 +88,7 @@ runs:
             exit 1
         fi
       env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
     - name: comment (server action already in progress)
@@ -104,12 +109,11 @@ runs:
       if: ${{ steps.check_instance.outputs.exists == 'true' }}
       shell: bash
       run: |
-        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
         source ~/venv/bin/activate
 
-        OS_CLOUD=BIO180006_IU openstack server $COMMAND_NAME "$INSTANCE_NAME"
+        openstack server $COMMAND_NAME "$INSTANCE_NAME"
       env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
         COMMAND_NAME: ${{ inputs.command_name }}
 
@@ -130,8 +134,6 @@ runs:
       if: ${{ steps.expected_status.outputs.value != '' }}
       shell: bash
       run: |
-        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
         source ~/venv/bin/activate
 
         max_wait_time=300  # Maximum wait time in seconds (300s -> 5mins)
@@ -168,6 +170,7 @@ runs:
 
         echo "status=$status" >> $GITHUB_OUTPUT
       env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
         EXPECTED_STATUS: ${{ steps.expected_status.outputs.value }}
 

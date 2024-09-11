@@ -5,6 +5,10 @@ on:
     - cron: "* * * * *"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ vars.MORPHOCLOUD_OS_CLOUD }}
+  cancel-in-progress: true
+
 jobs:
   collect-instance-uptime:
     runs-on: self-hosted
@@ -46,8 +50,6 @@ jobs:
       - name: Collect Instance Uptime
         id: collect-instance-uptime
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           instance_prefix=${PREFIX:+${PREFIX}_}
@@ -178,6 +180,7 @@ jobs:
             cat $JSON_FILE
             echo "--------"
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}
           JSON_DIR: ${{ steps.define-metadata.outputs.directory }}
 

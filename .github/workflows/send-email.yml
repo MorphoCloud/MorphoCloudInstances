@@ -19,7 +19,9 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "read,triage,write,maintain,admin"
-          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - uses: actions/checkout@v4
 
@@ -43,6 +45,7 @@ jobs:
         if: ${{ steps.email_command.outputs.continue == 'true' }}
         uses: ./.github/actions/check-instance-exists
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           instance_name: ${{ steps.define.outputs.instance_name }}
 
       - name: command results comment (Instance does not exist)
@@ -63,6 +66,7 @@ jobs:
         id: instance_metadata
         uses: ./.github/actions/retrieve-metadata
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           instance_name: ${{ steps.define.outputs.instance_name }}
 
       - name: comment (failed to retrieve instance metadata)

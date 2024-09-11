@@ -5,6 +5,10 @@ on:
     - cron: "* * * * *"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ vars.MORPHOCLOUD_OS_CLOUD }}
+  cancel-in-progress: true
+
 permissions:
   issues: write
   contents: read
@@ -23,8 +27,6 @@ jobs:
 
       - name: Auto Shelve
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           instance_prefix=${PREFIX:+${PREFIX}_}
@@ -101,6 +103,7 @@ jobs:
               fi
             done
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}

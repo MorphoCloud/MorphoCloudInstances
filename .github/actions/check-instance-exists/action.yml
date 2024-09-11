@@ -1,6 +1,11 @@
 name: "Check instance exists"
 description: "Check instance exists"
 inputs:
+  os_cloud:
+    description:
+      "Name of the OpenStack cloud allocation to select openstack auth settings
+      defined in '.config/openstack/clouds.yaml'"
+    required: true
   instance_name:
     description: "Name of the instance"
     required: true
@@ -15,8 +20,6 @@ runs:
       id: check_instance
       shell: bash
       run: |
-        export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
         source ~/venv/bin/activate
 
         instance=$(openstack server list -f json | \
@@ -30,4 +33,5 @@ runs:
         echo "exists [$exists]"
         echo "exists=$exists" >> $GITHUB_OUTPUT
       env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ inputs.instance_name }}

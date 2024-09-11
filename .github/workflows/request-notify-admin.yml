@@ -47,7 +47,7 @@ jobs:
           username: ${{secrets.MAIL_USERNAME}}
           password: ${{secrets.MAIL_PASSWORD}}
           from: ${{ github.event.repository.name }}
-          to: maga@uw.edu,jcfr@kitware.com
+          to: ${{ vars.MORPHOCLOUD_GITHUB_ADMIN_EMAILS }}
           subject:
             "[${{ github.event.repository.name }}] Approval requested for
             Instance ${{ steps.define.outputs.instance_name }}"

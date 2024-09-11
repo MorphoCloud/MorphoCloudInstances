@@ -26,7 +26,9 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "read,triage,write,maintain,admin"
-          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - name: shelve command
         id: shelve_command
@@ -36,7 +38,9 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "read,triage,write,maintain,admin"
-          allowlist: "jcfr,muratmaga,${{ github.event.issue.user.login }}"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - name: delete command
         id: delete_command
@@ -46,7 +50,7 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "write,maintain,admin"
-          allowlist: "jcfr,muratmaga"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
 
       - name: Set command metadata
         id: command
@@ -88,6 +92,7 @@ jobs:
         if: ${{ steps.command.outputs.continue == 'true' }}
         uses: ./.github/actions/control-instance
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           issue_number: ${{ github.event.issue.number }}
           command_name: ${{ steps.command.outputs.command_name }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}

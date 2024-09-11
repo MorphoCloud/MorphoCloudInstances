@@ -19,7 +19,7 @@ jobs:
           reaction: "rocket"
           allowed_contexts: "issue"
           permissions: "write,maintain,admin"
-          allowlist: "jcfr,muratmaga"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
 
       - uses: actions/checkout@v4
 
@@ -81,6 +81,7 @@ jobs:
         id: check_instance
         uses: ./.github/actions/check-instance-exists
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           instance_name: ${{ steps.define.outputs.instance_name }}
 
       - name: comment (Instance already created)
@@ -106,8 +107,6 @@ jobs:
       - name: Create floating IP
         id: ip_create
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           json_output=$(openstack floating ip create public -f json)
@@ -126,6 +125,8 @@ jobs:
           )
           echo "floating_ip_address [$floating_ip_address]"
           echo "floating_ip_address=$floating_ip_address" >> $GITHUB_OUTPUT
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
 
       - name: comment (floating IP creation failed)
         if: ${{ steps.ip_create.outcome == 'failure' && failure() }}
@@ -163,6 +164,7 @@ jobs:
         id: check_volume
         uses: ./.github/actions/check-volume-exists
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           volume_name: ${{ steps.define_volume_name.outputs.volume_name }}
 
       - name: comment (volume already exists)
@@ -181,12 +183,11 @@ jobs:
         if: ${{ ! fromJSON(steps.check_volume.outputs.exists) }}
         id: create_volume
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           openstack volume create --size 60 "${VOLUME_NAME}"
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
 
       - name: comment (failed to create volume)
@@ -217,8 +218,6 @@ jobs:
       - name: Create instance
         id: create_instance
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           echo Creating instance "$INSTANCE_NAME"
@@ -252,6 +251,7 @@ jobs:
             --column status
 
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
           INSTANCE_FLAVOR: ${{ steps.labels.outputs.instance_flavor }}
           FLOATING_IP_UUID: ${{ steps.ip_create.outputs.floating_ip_uuid }}
@@ -284,8 +284,6 @@ jobs:
       - name: Associate floating IP with created instance
         id: associated_ip
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           has_ip=$(
@@ -298,6 +296,7 @@ jobs:
             openstack server add floating ip "$INSTANCE_NAME" $FLOATING_IP_ADDRESS
           fi
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           FLOATING_IP_ADDRESS:
             ${{ steps.ip_create.outputs.floating_ip_address }}
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
@@ -330,8 +329,6 @@ jobs:
       - name: Poll instance setup status
         id: instance_poll
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           echo Polling "$INSTANCE_NAME" setup status
@@ -366,6 +363,7 @@ jobs:
 
           echo "status=$status" >> $GITHUB_OUTPUT
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
       - name: comment (maximum wait time exceeded)
@@ -396,8 +394,6 @@ jobs:
       - name: Attach Volume
         id: attach_volume
         run: |
-          export OS_CLOUD=BIO180006_IU # Select openstack auth settings defined in ".config/openstack/clouds.yaml"
-
           source ~/venv/bin/activate
 
           instance_id=$(openstack server list -f json | \
@@ -422,6 +418,7 @@ jobs:
             $instance_id \
             $volume_id
         env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
           VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
 
@@ -454,6 +451,7 @@ jobs:
         id: instance_metadata
         uses: ./.github/actions/retrieve-metadata
         with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           instance_name: ${{ steps.define.outputs.instance_name }}
 
       - name: comment (failed to retrieve instance metadata)

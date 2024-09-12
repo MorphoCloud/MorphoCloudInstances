@@ -19,9 +19,6 @@ inputs:
   attach_volume:
     description: "Template input set to '', ✅ or ⏳"
     required: true
-  retrieve_connection_url:
-    description: "Template input set to '', ✅ or ⏳"
-    required: true
   send_email:
     description: "Template input set to '', ✅ or ⏳"
     required: true
@@ -45,7 +42,6 @@ runs:
           "{{ inputs.associate_ip }}" == "✅" && \
           "{{ inputs.setup_instance }}" == "✅" && \
           "{{ inputs.attach_volume }}" == "✅" && \
-          "{{ inputs.retrieve_connection_url }}" == "✅" && \
           "{{ inputs.send_email }}" == "✅" \
           ]]; then
           value="✅"
@@ -67,7 +63,6 @@ runs:
           associate_ip: ${{ inputs.associate_ip }}
           setup_instance: ${{ inputs.setup_instance }}
           attach_volume: ${{ inputs.attach_volume }}
-          retrieve_connection_url: ${{ inputs.retrieve_connection_url }}
           send_email: ${{ inputs.send_email }}
           status: ${{ steps.status.outputs.value }}
 

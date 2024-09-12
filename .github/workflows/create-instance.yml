@@ -44,16 +44,7 @@ jobs:
           associate_ip: ""
           setup_instance: ""
           attach_volume: ""
-          retrieve_connection_url: ""
           send_email: ""
-
-      - name: Extract fields
-        id: extract
-        uses: ./.github/actions/extract-issue-fields
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          issue_number: ${{ github.event.issue.number }}
 
       - name: Extract labels
         id: labels
@@ -150,7 +141,6 @@ jobs:
           associate_ip: ""
           setup_instance: ""
           attach_volume: ""
-          retrieve_connection_url: ""
           send_email: ""
 
       - name: Define volume name
@@ -212,7 +202,6 @@ jobs:
           associate_ip: ""
           setup_instance: ""
           attach_volume: ""
-          retrieve_connection_url: ""
           send_email: ""
 
       - name: Create instance
@@ -278,7 +267,6 @@ jobs:
           associate_ip: ⏳
           setup_instance: ""
           attach_volume: ""
-          retrieve_connection_url: ""
           send_email: ""
 
       - name: Associate floating IP with created instance
@@ -323,7 +311,6 @@ jobs:
           associate_ip: ✅
           setup_instance: ⏳
           attach_volume: ""
-          retrieve_connection_url: ""
           send_email: ""
 
       - name: Poll instance setup status
@@ -388,7 +375,6 @@ jobs:
           associate_ip: ✅
           setup_instance: ✅
           attach_volume: ⏳
-          retrieve_connection_url: ""
           send_email: ""
 
       - name: Attach Volume
@@ -444,93 +430,32 @@ jobs:
           associate_ip: ✅
           setup_instance: ✅
           attach_volume: ✅
-          retrieve_connection_url: ⏳
-          send_email: ""
-
-      - name: Retrieve metadata
-        id: instance_metadata
-        uses: ./.github/actions/retrieve-metadata
-        with:
-          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
-          instance_name: ${{ steps.define.outputs.instance_name }}
-
-      - name: comment (failed to retrieve instance metadata)
-        if: ${{ steps.instance_metadata.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ### Instance Creation Results ❌
-
-            Failed to retrieve metadata for instance **${{ steps.define.outputs.instance_name }}**.
-
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Generate Guacamole Connection URL
-        if: ${{ steps.instance_poll.outputs.status == 'complete' }}
-        id: guacamole
-        uses: ./.github/actions/generate-connection-url
-        with:
-          instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
-
-      - name: comment (failed to generate connection URL)
-        if: ${{ steps.guacamole.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ### Instance Creation Results ❌
-
-            Failed to generate connection URL for instance **${{ steps.define.outputs.instance_name }}**.
-
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: comment (progress)
-        uses: ./.github/actions/comment-progress
-        with:
-          comment-id: ${{ steps.couc_progress.outputs.comment-id }}
-          create_ip: ✅
-          create_volume: ✅
-          create_instance: ✅
-          associate_ip: ✅
-          setup_instance: ✅
-          attach_volume: ✅
-          retrieve_connection_url: ✅
           send_email: ⏳
 
-      - name: Check if email is encoded
-        id: check_email_encryption
-        run: |
-          if [[ "$EMAIL" != *"@"* ]]; then
-            encoded="true"
-          else
-            encoded="false"
-          fi
-          echo "encoded=$encoded" >> $GITHUB_OUTPUT
-        env:
-          EMAIL: ${{ steps.extract.outputs.email }}
-
-      - name: Decode email
-        id: decode_email
-        uses: ./.github/actions/encode-decode-string
-        with:
-          input_string: ${{ steps.extract.outputs.email }}
-          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
-          operation: "decode"
-          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
-
-      - name: Send mail (completed)
+      - name: Send mail
+        id: send_email
         if: ${{ steps.instance_poll.outputs.status == 'complete' }}
         uses: ./.github/actions/send-email
         with:
-          to: ${{ steps.decode_email.outputs.output_string }}
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}
           instance_name: ${{ steps.define.outputs.instance_name }}
           instance_issue_number: ${{ github.event.issue.number }}
-          connection_url: ${{ steps.guacamole.outputs.connection_url }}
-          instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
-          instance_pwd: ${{ steps.instance_metadata.outputs.instance_pwd }}
+
+      - name: comment (failed to send email)
+        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to send connection email for instance **${{ steps.define.outputs.instance_name }}**. ${{ steps.send_email.outputs.error_message }}
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: comment (progress)
         uses: ./.github/actions/comment-progress
@@ -542,5 +467,4 @@ jobs:
           associate_ip: ✅
           setup_instance: ✅
           attach_volume: ✅
-          retrieve_connection_url: ✅
           send_email: ✅

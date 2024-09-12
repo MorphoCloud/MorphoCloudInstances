@@ -51,3 +51,7 @@ jobs:
           issue_number: ${{ inputs.issue_number }}
           command_name: ${{ inputs.command_name }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}

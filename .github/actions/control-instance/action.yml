@@ -16,6 +16,18 @@ inputs:
   instance_name_prefix:
     description: "Instance name prefix"
     required: true
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
+  mail_server_username:
+    description: "mail server username"
+    required: true
+  mail_server_password:
+    description: "mail server password"
+    required: true
 runs:
   using: "composite"
   steps:
@@ -183,6 +195,33 @@ runs:
           ### Command Results ❌
 
           Maximum wait time for command `${{ inputs.command_name }}` command to complete exceeded.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Send email
+      id: send_email
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && success()  &&
+        inputs.command_name == 'unshelve' }}
+      uses: ./.github/actions/send-email
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
+        instance_name: ${{ steps.define.outputs.instance_name }}
+        instance_issue_number: ${{ inputs.issue_number }}
+
+    - name: comment (failed to send email)
+      if: ${{ steps.send_email.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          Failed to send connection email for instance **${{ steps.define.outputs.instance_name }}**. ${{ steps.send_email.outputs.error_message }}
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

@@ -39,20 +39,34 @@ runs:
         fi
         echo "instance_ip=$instance_ip" >> $GITHUB_OUTPUT
 
-        # Get instance password
+        # Get instance password from tags
         instance_pwd=$(
           openstack server show $INSTANCE_NAME -c tags -f json | \
           jq -r '.tags[] | select(startswith("exoPw")) | sub("^exoPw:"; "")'
         )
+
+        # Retry logic for SSH-based password retrieval
         if [[ -z "$instance_pwd" ]]; then
           # Since 'exoPw' tag may not yet set, attempt to directly retrieve the password using
           # the openstack endpoint local to the instance.
-          instance_pwd=$(ssh \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o LogLevel=ERROR \
-            exouser@$instance_ip \
-            'curl --silent http://169.254.169.254/openstack/latest/password')
+          function retrieve_password {
+            instance_pwd=$(ssh \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              exouser@$instance_ip \
+              'curl --silent http://169.254.169.254/openstack/latest/password')
+            echo "$instance_pwd"
+          }
+          echo "Password not found in tags, attempting to retrieve via SSH..."
+          for attempt in {1..2}; do
+            instance_pwd=$(retrieve_password)
+            if [[ -n "$instance_pwd" ]]; then
+              break
+            fi
+            echo "Retrying password retrieval ($attempt)..."
+            sleep 20
+          done
         fi
         if [[ -z "$instance_pwd" ]]; then
           echo "::error ::Failed to retrieve $INSTANCE_NAME password"

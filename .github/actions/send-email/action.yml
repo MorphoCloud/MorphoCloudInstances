@@ -118,6 +118,17 @@ runs:
           - Username: **exouser**
           - Passphrase: `${{ steps.instance_metadata.outputs.instance_pwd }}`
 
+          **Supported Issue Commands:**
+
+          _The commands listed below may be added as comments to issue [${{ github.repository }}#${{ inputs.instance_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.instance_issue_number }}). Only one command
+          may be entered per comment._
+
+          - `/shelve`: Shelve **${{ inputs.instance_name }}**
+          - `/unshelve`: Unshelve **${{ inputs.instance_name }}**
+          - `/encode_email`: Update issue description obfuscating email
+          - `/decode_email`: Update issue description deobfuscating email
+          - `/email`: Send this email with connection URL
+
     - name: Set error message
       id: set_error_message
       if: ${{ failure() }}

@@ -47,7 +47,6 @@ runs:
         instance_name: ${{ inputs.instance_name }}
 
     - name: Generate Guacamole Connection URL
-      if: ${{ steps.instance_poll.outputs.status == 'complete' }}
       id: guacamole
       uses: ./.github/actions/generate-connection-url
       with:

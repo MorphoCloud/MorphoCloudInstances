@@ -30,12 +30,13 @@ runcmd:
     pip install --upgrade pip
     pip install ansible-core
     pip install lxml # required by community.general.xml
+    pip install psutil # required by community.general.pids
     ansible-galaxy collection install community.general
     # --url "{instance-config-mgt-repo-url}"
     # --checkout "{instance-config-mgt-repo-checkout}"
     # -e "{ansible-extra-vars}"
     rm -rf /opt/instance-config-mgt
-    exosphere_sha="22ca67a8275d40654e078e71e50f9c5f666dc2e1" # morpho-cloud-portal-2024.07.17-78a7e2d93
+    exosphere_sha="c0c274deec732bd3fae393f5b81009db70456db6" # morpho-cloud-portal-2024.07.17-78a7e2d93
     ansible-pull \
       --url "https://github.com/MorphoCloud/exosphere.git" \
       --checkout "$exosphere_sha" \

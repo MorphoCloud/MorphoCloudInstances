@@ -1,0 +1,79 @@
+name: "Update Request Status Label"
+description: "Update Request Status Label"
+inputs:
+  os_cloud:
+    description:
+      "Name of the OpenStack cloud allocation to select openstack auth settings
+      defined in '.config/openstack/clouds.yaml'"
+    required: true
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  issue_number:
+    description:
+      "The GitHub issue number that corresponds to the instance request."
+    required: true
+  instance_name:
+    description:
+      "The name of the instance for which the status is being updated."
+    required: true
+  instance_status:
+    description: |
+      "Optionally specify the instance status directly instead of retrieving it from
+      OpenStack. If provided, the action will use this status without querying."
+runs:
+  using: "composite"
+  steps:
+    - name: Retrieve instance status
+      id: retrieve_instance_status
+      if: ${{ inputs.instance_status == '' }}
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        echo Retrieving instance "$INSTANCE_NAME" status
+
+        server_count=$(
+          openstack server list --name "^${INSTANCE_NAME}$" -f json | \
+          jq length
+        )
+        if [[ $server_count == 1 ]]; then
+          # Get instance status
+          instance_status=$(
+            openstack server show $INSTANCE_NAME -c status -f json | \
+            jq -r .status
+          )
+        else
+          echo "::error ::Unexpected number of server '$server_count'. Expected count is 1."
+          exit 1
+        fi
+        echo "instance_status [$instance_status]"
+        echo "instance_status=$instance_status" >> $GITHUB_OUTPUT
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ inputs.instance_name }}
+
+    - name: Update issues
+      shell: bash
+      run: |
+        issue_number=$ISSUE_NUMBER
+        status_lowercase=${INSTANCE_STATUS,,}
+
+        add_label="status:$status_lowercase"
+
+        remove_labels=$(gh issue view $issue_number --json labels | \
+          jq \
+            -r \
+            --arg add_label "$add_label" \
+            -c '[.labels[].name | select(test("^status:")?) | select(. != $add_label)] | join(",")')
+
+        echo "Updating issue $issue_number adding label [$add_label] and removing labels [$remove_labels]"
+
+        gh issue edit ${issue_number} --add-label "${add_label}" --remove-label "${remove_labels}"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        INSTANCE_STATUS:
+          ${{ inputs.instance_status != '' && inputs.instance_status ||
+          steps.retrieve_instance_status.outputs.instance_status }}

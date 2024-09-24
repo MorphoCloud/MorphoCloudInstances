@@ -420,6 +420,29 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+      - name: Update Request Status Label
+        id: update-request-status-label
+        uses: ./.github/actions/update-request-status-label
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: comment (failed to update request status label)
+        if:
+          ${{ steps.update-request-status-label.outcome == 'failure' &&
+          failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to update request status label for instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: comment (progress)
         uses: ./.github/actions/comment-progress
         with:

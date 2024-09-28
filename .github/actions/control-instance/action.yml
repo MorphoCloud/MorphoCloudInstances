@@ -89,7 +89,7 @@ runs:
       run: |
         source ~/venv/bin/activate
 
-        task_state=$(openstack server show instance-30 -f json | \
+        task_state=$(openstack server show $INSTANCE_NAME -f json | \
           jq -r '.["OS-EXT-STS:task_state"]')
 
         echo "task_state [$task_state]"

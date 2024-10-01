@@ -1,0 +1,52 @@
+name: Delete Instance and Volume
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  delete_instance_and_volume:
+    runs-on: self-hosted
+    if:
+      ${{ !github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/delete_all') ) }}
+    steps:
+      - name: delete_instance_and_volume command
+        id: delete_instance_and_volume_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/delete_all"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+
+      - uses: actions/checkout@v4
+
+      - name: Delete volume
+        id: delete_volume
+        if:
+          ${{ steps.delete_instance_and_volume_command.outputs.continue ==
+          'true' }}
+        uses: ./.github/actions/delete-volume
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          issue_number: ${{ github.event.issue.number }}
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          volume_name_suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
+
+      - name: Delete instance
+        id: delete_instance
+        if:
+          ${{ steps.delete_instance_and_volume_command.outputs.continue ==
+          'true' }}
+        uses: ./.github/actions/control-instance
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          issue_number: ${{ github.event.issue.number }}
+          command_name: "delete"
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}

@@ -1,0 +1,142 @@
+name: "Delete Volume"
+description: "Delete Volume"
+inputs:
+  os_cloud:
+    description:
+      "Name of the OpenStack cloud allocation to select openstack auth settings
+      defined in '.config/openstack/clouds.yaml'"
+    required: true
+  issue_number:
+    description: "Issue number"
+    required: true
+  instance_name_prefix:
+    description: "Instance name prefix"
+    required: true
+  volume_name_suffix:
+    description: "Volume name suffix"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Define volume name
+      id: define_volume_name
+      uses: ./.github/actions/define-volume-name
+      with:
+        issue_number: ${{ inputs.issue_number }}
+        suffix: ${{ inputs.volume_name_suffix }}
+
+    - name: Check volume exists
+      id: check_volume
+      uses: ./.github/actions/check-volume-exists
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        volume_name: ${{ steps.define_volume_name.outputs.volume_name }}
+
+    - name: comment (volume does not exist)
+      if: ${{ steps.check_volume.outputs.exists == 'false' }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ github.event.issue.number }}
+        body: |
+          ### Command Results ❌
+
+          `/delete_volume` command failed because **${{ steps.define_volume_name.outputs.volume_name }}** volume does not exist.
+
+    - name: Define instance name
+      id: define
+      uses: ./.github/actions/define-instance-name
+      with:
+        prefix: ${{ inputs.instance_name_prefix }}
+        issue_number: ${{ inputs.issue_number }}
+
+    - name: Check instance exists
+      id: check_instance
+      uses: ./.github/actions/check-instance-exists
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        instance_name: ${{ steps.define.outputs.instance_name }}
+
+    - name: Detach Volume
+      if:
+        ${{ steps.check_volume.outputs.exists == 'true' &&
+        steps.check_instance.outputs.exists == 'true' }}
+      id: detach_volume
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        volume_id=$(openstack volume list -f json | \
+          jq \
+          --arg volume_name "$VOLUME_NAME" \
+          -c '.[] | select(.Name == $volume_name)' | \
+          jq -r '.ID' | tail -1)
+        echo "volume_id [$volume_id]"
+
+        instance_id=$(openstack server list -f json | \
+          jq \
+          --arg instance_name "$INSTANCE_NAME" \
+          -c '.[] | select(.Name == $instance_name)' | \
+          jq -r '.ID' | tail -1)
+        echo "instance_id [$instance_id]"
+
+        openstack server remove volume \
+          $instance_id \
+          $volume_id
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+        VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
+
+    - name: comment (failed to detach volume)
+      if: ${{ steps.detach_volume.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ github.event.issue.number }}
+        body: |
+          ### Command Results ❌
+
+          Failed to detach volume **${{ steps.define_volume_name.outputs.volume_name }}**
+          from instance **${{ steps.define_volume_name.outputs.volume_name }}**.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Delete Volume
+      if: ${{ steps.check_volume.outputs.exists == 'true' }}
+      id: delete_volume
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        volume_id=$(openstack volume list -f json | \
+          jq \
+          --arg volume_name "$VOLUME_NAME" \
+          -c '.[] | select(.Name == $volume_name)' | \
+          jq -r '.ID' | tail -1)
+        echo "volume_id [$volume_id]"
+
+        openstack volume delete $volume_id
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
+
+    - name: comment (failed to delete volume)
+      if: ${{ steps.delete_volume.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ github.event.issue.number }}
+        body: |
+          ### Command Results ❌
+
+          Failed to delete volume **${{ steps.define_volume_name.outputs.volume_name }}**.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: command results comment (success)
+      if: ${{ steps.check_volume.outputs.exists == 'true' }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ✅
+
+          Volume **${{ steps.define_volume_name.outputs.volume_name }}** successfully deleted.

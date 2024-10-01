@@ -1,0 +1,34 @@
+name: Delete Volume
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  delete_volume:
+    runs-on: self-hosted
+    if:
+      ${{ !github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/delete_volume') ) }}
+    steps:
+      - name: delete_volume command
+        id: delete_volume_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/delete_volume"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+
+      - uses: actions/checkout@v4
+
+      - name: Delete volume
+        id: delete_volume
+        if: ${{ steps.delete_volume_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/delete-volume
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          issue_number: ${{ github.event.issue.number }}
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          volume_name_suffix: ${{ vars.VOLUME_NAME_SUFFIX }}

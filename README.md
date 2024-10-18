@@ -25,6 +25,11 @@ In a nutshell, you:
 Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
 click **Get Started** and fill in the issue template.
 
+## JetStream2 Operational Status
+
+<a href="https://jetstream.status.io/" target="_blank" rel="noopener noreferrer">
+Click to see JetStream2's most recent operational status report</a>
+
 ### FUNDING ACKNOWLEDGEMENT
 
 MorphoCloud services, including MorphoCloud OnDemand Instances, are supported by

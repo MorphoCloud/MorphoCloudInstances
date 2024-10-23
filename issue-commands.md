@@ -7,8 +7,8 @@ may be entered per comment._
 | ------------------ | -------------------------------------------------- | -------------------- |
 | `/shelve`          | Shelve the instance.                               | Issue creator, Admin |
 | `/unshelve`        | Unshelve the instance.                             | Issue creator, Admin |
-| `/encode_email`    | Update issue description obfuscating email.        | Issue creator, Admin |
-| `/decode_email`    | Update issue description deobfuscating email.      | Issue creator, Admin |
+| `/encode_email`    | Update issue description obfuscating emails.       | Issue creator, Admin |
+| `/decode_email`    | Update issue description deobfuscating emails.     | Issue creator, Admin |
 | `/email`           | Send email to _Issue creator_ with connection URL. | Issue creator, Admin |
 | `/create`          | Create the instance and associated volume.         | Admin                |
 | `/delete_instance` | Delete the instance.                               | Admin                |

@@ -1,0 +1,54 @@
+name: Update Issue from Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: number
+      command_name:
+        description:
+          "Name of the command to execute: encode_email, decode_email"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: number
+      command_name:
+        description:
+          "Name of the command to execute: encode_email, decode_email"
+        required: true
+        type: string
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  control:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add comment
+        run: |
+          gh issue comment $ISSUE_NUMBER \
+            -b "Command <tt>${COMMAND_NAME}</tt> issued by **update-issue-from-workflow.yml** workflow<br> \
+            <br> \
+            For details, see https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          COMMAND_NAME: ${{ inputs.command_name }}
+
+      - name: Update issue
+        uses: ./.github/actions/update-issue-description
+        with:
+          issue_number: ${{ inputs.issue_number }}
+          command_name: ${{ inputs.command_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}

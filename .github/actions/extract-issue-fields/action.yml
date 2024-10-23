@@ -20,6 +20,9 @@ outputs:
   email:
     description: "Email"
     value: ${{ steps.extract.outputs.email }}
+  confirm_email:
+    description: "Confirm Email"
+    value: ${{ steps.extract.outputs.confirm_email }}
 runs:
   using: "composite"
   steps:
@@ -69,3 +72,18 @@ runs:
           sed -E 's/^<([^<>]+)>$/\1/'
         )
         echo "email=$email" >> $GITHUB_OUTPUT
+
+        # Also strip "<" and ">" to convert from "<name@domain.org>" to "name@domain.org"
+        confirm_email=$(
+          echo ${{ toJSON(steps.parse.outputs.data) }} |
+          jq -r '."confirm-email".text // empty' |
+          sed -E 's/^<([^<>]+)>$/\1/'
+        )
+
+        # If the "Confirm Email" field is missing (e.g., in older issues),
+        # set confirm_email to match email to ensure compatibility.
+        if [[ -z "$confirm_email" ]]; then
+          confirm_email="$email"
+        fi
+
+        echo "confirm_email=$confirm_email" >> $GITHUB_OUTPUT

@@ -124,8 +124,8 @@ runs:
 
           - `/shelve`: Shelve **${{ inputs.instance_name }}**
           - `/unshelve`: Unshelve **${{ inputs.instance_name }}**
-          - `/encode_email`: Update issue description obfuscating email
-          - `/decode_email`: Update issue description deobfuscating email
+          - `/encode_email`: Update issue description obfuscating emails
+          - `/decode_email`: Update issue description deobfuscating emails
           - `/email`: Send this email with connection URL
 
     - name: Set error message

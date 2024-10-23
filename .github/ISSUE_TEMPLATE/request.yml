@@ -33,7 +33,7 @@ body:
   - type: input
     attributes:
       label: ORCID
-      description: Your ORCID iD profile.
+      description: Enter your ORCID iD for identification purposes.
       placeholder: 0000-0000-0000-0000
     validations:
       required: true
@@ -42,6 +42,17 @@ body:
     attributes:
       label: Email
       description:
-        Email to use for notifications. Please double check your entry.
+        Enter the email address that should receive notifications about the
+        instance. Ensure this is a valid, regularly checked email.
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Confirm Email
+      description:
+        Re-enter your email address to verify it is correct. This step ensures
+        that notifications are sent to the correct address. Please double-check
+        for typos.
     validations:
       required: true

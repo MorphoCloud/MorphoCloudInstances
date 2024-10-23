@@ -219,7 +219,6 @@ jobs:
 
           openstack server create "$INSTANCE_NAME" \
             --nic net-id="auto_allocated_network" \
-            --security-group "default" \
             --security-group "exosphere" \
             --flavor $INSTANCE_FLAVOR \
             --image "Featured-Ubuntu22" \

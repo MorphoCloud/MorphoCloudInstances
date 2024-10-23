@@ -69,19 +69,43 @@ jobs:
               #   an issue where SSH breaks out of the while loop in Bash.
               #   Reference: https://stackoverflow.com/questions/9393038/ssh-breaks-out-of-while-loop-in-bash
 
-              # Retrieve the instance uptime using SSH
-              uptime_seconds=$(ssh \
+              has_check_instance_shelve_script=$(ssh \
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o LogLevel=ERROR \
                 exouser@$instance_ip \
-                  'cat /proc/uptime | awk  "{print \$1}"' < /dev/null)
+                  'bash -c "[[ -f /home/exouser/dist/check-instance-shelve.sh ]] && echo yes || echo no"' < /dev/null)
               if [[ $? -ne 0 ]]; then
-                echo "::warning ::Failed to retrieve uptime for $instance_name using IP $instance_ip"
+                echo "::warning ::Failed to check if 'check-instance-shelve.sh' was found on $instance_name using IP $instance_ip"
                 continue
               fi
-              # Convert uptime from seconds to hours
-              uptime_hours=$(echo "scale=2; $uptime_seconds / 3600" | bc)
+
+              if [[ "$has_check_instance_shelve_script" == "yes" ]]; then
+                uptime_hours=$(ssh \
+                -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null \
+                -o LogLevel=ERROR \
+                exouser@$instance_ip \
+                  '/home/exouser/dist/check-instance-shelve.sh -d' < /dev/null)
+                if [[ $? -ne 0 ]]; then
+                  echo "::warning ::Failed to retrieve uptime for $instance_name using IP $instance_ip"
+                  continue
+                fi
+              else
+                # Retrieve the instance uptime using SSH
+                uptime_seconds=$(ssh \
+                  -o StrictHostKeyChecking=no \
+                  -o UserKnownHostsFile=/dev/null \
+                  -o LogLevel=ERROR \
+                  exouser@$instance_ip \
+                    'cat /proc/uptime | awk  "{print \$1}"' < /dev/null)
+                if [[ $? -ne 0 ]]; then
+                  echo "::warning ::Failed to retrieve uptime for $instance_name using IP $instance_ip"
+                  continue
+                fi
+                # Convert uptime from seconds to hours
+                uptime_hours=$(echo "scale=2; $uptime_seconds / 3600" | bc)
+              fi
               # Check uptime and define action
               if $(python3 -c "valid=($uptime_hours > 3.5 and $uptime_hours <= 4.0); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
                 action="notify"
@@ -90,7 +114,7 @@ jobs:
               else
                 action=""
               fi
-              echo "instance_name [$instance_name], uptime_hours [$uptime_hours] -> action[$action]"
+              echo "instance_name [$instance_name], has_check_instance_shelve_script [$has_check_instance_shelve_script], uptime_hours [$uptime_hours] -> action[$action]"
               # Perform action
               if [[ "$action" == "shelve" ]]; then
                 gh workflow run control-instance-from-workflow.yml \

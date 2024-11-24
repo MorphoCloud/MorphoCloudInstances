@@ -35,7 +35,7 @@ runs:
         fi
         if [[ $SKIP == "false" ]]; then
           if [[ $OPERATION == "encode" ]]; then
-            output_string=$(echo "$INPUT_STRING" | openssl enc -base64 -e -aes-256-cbc -salt -pass pass:$ENCRYPTION_KEY -pbkdf2)
+            output_string=$(echo "$INPUT_STRING" | openssl enc -base64 -e -aes-256-cbc -salt -pass pass:$ENCRYPTION_KEY -pbkdf2 -A)
           else
             output_string=$(echo "$INPUT_STRING" | openssl enc -base64 -d -aes-256-cbc -salt -pass pass:$ENCRYPTION_KEY -pbkdf2)
           fi

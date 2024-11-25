@@ -23,7 +23,8 @@ In a nutshell, you:
 ## Ready to give a try?
 
 Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
-click **Get Started** and fill in the issue template.
+click **Get Started** and fill in the issue template. Your request will be
+approved within 24h (often faster).
 
 ## JetStream2 Operational Status
 

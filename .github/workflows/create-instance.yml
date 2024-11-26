@@ -175,7 +175,7 @@ jobs:
         run: |
           source ~/venv/bin/activate
 
-          openstack volume create --size 60 "${VOLUME_NAME}"
+          openstack volume create --size 100 "${VOLUME_NAME}"
         env:
           OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
@@ -376,6 +376,30 @@ jobs:
           attach_volume: ⏳
           send_email: ""
 
+      - name: Rename MyData directory to MyData-tmp
+        id: rename_mydata
+        run: |
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            exouser@$INSTANCE_IP \
+            'mv /media/volume/MyData /media/volume/MyData-tmp'
+        env:
+          INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
+
+      - name: comment (failed to rename MyData)
+        if: ${{ steps.rename_mydata.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to rename `/media/volume/MyData` to `/media/volume/MyData-tmp` for instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: Attach Volume
         id: attach_volume
         run: |
@@ -416,6 +440,56 @@ jobs:
             ### Instance Creation Results ❌
 
             Failed to attach volume **${{ steps.define_volume_name.outputs.volume_name }}** to instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Copy installed files into attached volume
+        id: copy_installed_files
+        run: |
+          function check_mountpoint_ready {
+            ssh \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              exouser@$INSTANCE_IP \
+              'mountpoint -q /media/volume/MyData'
+          }
+          set +e
+          max_attempts=5
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Checking if mount point is ready ($attempt/$max_attempts)"
+            check_mountpoint_ready
+            if check_mountpoint_ready; then
+              echo "Mount point /media/volume/MyData is ready."
+              break
+            else
+              echo "Mount point not ready. Retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+          if ! check_mountpoint_ready; then
+            echo "::error ::Mount point /media/volume/MyData not ready after $((max_attempts * 5)) seconds."
+            exit 1
+          fi
+          set -e
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            exouser@$INSTANCE_IP \
+            '[ ! -d /media/volume/MyData/Slicer ] && mv /media/volume/MyData-tmp/Slicer /media/volume/MyData/Slicer; mv /media/volume/MyData-tmp/dist /media/volume/MyData/dist'
+        env:
+          INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
+
+      - name: comment (failed to copy installed files from MyData-tmp to MyData)
+        if: ${{ steps.copy_installed_files.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to copy installed files from `/media/volume/MyData-tmp` to `/media/volume/MyData` for instance **${{ steps.define.outputs.instance_name }}**.
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

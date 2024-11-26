@@ -493,6 +493,30 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+      - name: Create Renviron file
+        id: create_renviron_file
+        run: |
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            exouser@$INSTANCE_IP \
+            'echo -e "R_LIBS_SITE=/media/share/MorphoCloudCephShare/R/x86_64-pc-linux-gnu-library/4.4/\nR_LIBS_USER=/media/volume/MyData/R/x86_64-pc-linux-gnu-library/4.4/" > /home/exouser/.Renviron'
+        env:
+          INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
+
+      - name: comment (failed to create /home/exouser/.Renviron)
+        if: ${{ steps.create_renviron_file.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to create `/home/exouser/.Renviron` file for instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: Update Request Status Label
         id: update-request-status-label
         uses: ./.github/actions/update-request-status-label

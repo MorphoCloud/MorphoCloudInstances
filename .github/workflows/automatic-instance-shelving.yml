@@ -74,7 +74,7 @@ jobs:
                 -o UserKnownHostsFile=/dev/null \
                 -o LogLevel=ERROR \
                 exouser@$instance_ip \
-                  'bash -c "[[ -f /home/exouser/dist/check-instance-shelve.sh ]] && echo yes || echo no"' < /dev/null)
+                  'bash -c "[[ -f /opt/instance-config-support/dist/check-instance-shelve.sh ]] && echo yes || echo no"' < /dev/null)
               if [[ $? -ne 0 ]]; then
                 echo "::warning ::Failed to check if 'check-instance-shelve.sh' was found on $instance_name using IP $instance_ip"
                 continue
@@ -86,7 +86,7 @@ jobs:
                 -o UserKnownHostsFile=/dev/null \
                 -o LogLevel=ERROR \
                 exouser@$instance_ip \
-                  '/home/exouser/dist/check-instance-shelve.sh -d' < /dev/null)
+                  '/opt/instance-config-support/dist/check-instance-shelve.sh -d' < /dev/null)
                 if [[ $? -ne 0 ]]; then
                   echo "::warning ::Failed to retrieve uptime for $instance_name using IP $instance_ip"
                   continue

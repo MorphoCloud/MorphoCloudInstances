@@ -477,7 +477,7 @@ jobs:
             -o UserKnownHostsFile=/dev/null \
             -o LogLevel=ERROR \
             exouser@$INSTANCE_IP \
-            '[ ! -d /media/volume/MyData/Slicer ] && mv /media/volume/MyData-tmp/Slicer /media/volume/MyData/Slicer; mv /media/volume/MyData-tmp/dist /media/volume/MyData/dist'
+            '[ ! -d /media/volume/MyData/Slicer ] && mv /media/volume/MyData-tmp/Slicer /media/volume/MyData/Slicer'
         env:
           INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
 

@@ -501,7 +501,7 @@ jobs:
             -o UserKnownHostsFile=/dev/null \
             -o LogLevel=ERROR \
             exouser@$INSTANCE_IP \
-            'echo -e "R_LIBS_SITE=/media/share/MorphoCloudCephShare/R/x86_64-pc-linux-gnu-library/4.4/\nR_LIBS_USER=/media/volume/MyData/R/x86_64-pc-linux-gnu-library/4.4/" > /home/exouser/.Renviron'
+            'echo -e "R_LIBS_SITE=/media/share/MorphoCloudCephShare/R/x86_64-pc-linux-gnu-library/4.4/\nR_LIBS_USER=/media/volume/MyData/R/x86_64-pc-linux-gnu-library/4.4/" > /home/exouser/.Renviron && mkdir -p /media/volume/MyData/R/x86_64-pc-linux-gnu-library/4.4/'
         env:
           INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
 

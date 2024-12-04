@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        _Please enter a short description of your project in the title bar above this text. E.g.,: "Instance: 3D analysis of bryozoans"._
+        _Please enter a short description of your project in the title bar above this text, followed by your Full Name. E.g.,: "Instance: 3D analysis of bryozoans; Jane Doe"_
 
   - type: dropdown
     attributes:

@@ -233,9 +233,7 @@ runs:
         body: |
           ### Command Results ✅
 
-          `${{ inputs.command_name }}` command successfully applied to **${{ steps.define.outputs.instance_name }}** instance.
-
-          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Instance **${{ steps.define.outputs.instance_name }}** successfully ${{ inputs.command_name }}d.
 
     - name: Update Request Status Label
       uses: ./.github/actions/update-request-status-label

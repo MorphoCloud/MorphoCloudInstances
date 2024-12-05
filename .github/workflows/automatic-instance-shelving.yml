@@ -120,10 +120,6 @@ jobs:
                 gh workflow run control-instance-from-workflow.yml \
                   -f issue_number=$issue_number \
                   -f command_name=shelve
-                gh issue comment $issue_number \
-                  -b "Workflow **control-instance-from-workflow.yml** triggered by **automatic-instance-shelving.yml** for command <tt>shelve</tt><br> \
-                  <br> \
-                  For details, see https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
               fi
             done
         env:

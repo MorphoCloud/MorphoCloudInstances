@@ -167,8 +167,6 @@ jobs:
 
             Volume **${{ steps.define_volume_name.outputs.volume_name }}** already exists.
 
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - name: Create Volume
         if: ${{ ! fromJSON(steps.check_volume.outputs.exists) }}
         id: create_volume

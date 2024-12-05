@@ -87,5 +87,3 @@ jobs:
             ### Command Results ✅
 
             `email` command successfully completed for **${{ steps.define.outputs.instance_name }}** instance.
-
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

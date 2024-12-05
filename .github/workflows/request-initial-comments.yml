@@ -38,18 +38,9 @@ jobs:
           prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
 
-      - name: Find Instance Name Comment
-        uses: peter-evans/find-comment@v3
-        id: fc_instance_name
+      - name: description (instance name)
+        uses: julien-deramond/update-issue-body@v1.1.0
         with:
-          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
-          comment-author: "github-actions[bot]"
-          body-includes: "### Instance Name"
-
-      - name: comment (instance name)
-        uses: peter-evans/create-or-update-comment@v4.0.0
-        with:
-          comment-id: ${{ steps.fc_instance_name.outputs.comment-id }}
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body: |
             ### Instance Name
@@ -57,7 +48,8 @@ jobs:
             `${{ steps.define.outputs.instance_name }}`
 
             _The instance name is derived from the GitHub issue number using the template `${{ steps.define.outputs.instance_prefix }}instance-NNN`. The instance may also be located in the exosphere interface using this name._
-          edit-mode: replace
+          edit-mode: append
+          append-separator: newline
 
       - name: Define volume name
         id: define_volume_name
@@ -66,18 +58,9 @@ jobs:
           issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
           suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
 
-      - name: Find Volume Name Comment
-        uses: peter-evans/find-comment@v3
-        id: fc_volume_name
+      - name: description (volume name)
+        uses: julien-deramond/update-issue-body@v1.1.0
         with:
-          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
-          comment-author: "github-actions[bot]"
-          body-includes: "### Volume Name"
-
-      - name: comment (volume name)
-        uses: peter-evans/create-or-update-comment@v4.0.0
-        with:
-          comment-id: ${{ steps.fc_volume_name.outputs.comment-id }}
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body: |
             ### Volume Name
@@ -85,7 +68,8 @@ jobs:
             `${{ steps.define_volume_name.outputs.volume_name }}`
 
             _The volume name is derived from the GitHub issue number using the template `My-Data-NNN${{ steps.define_volume_name.outputs.volume_suffix }}`. The volume may also be located in the exosphere interface using this name._
-          edit-mode: replace
+          edit-mode: append
+          append-separator: newline
 
       - name: Find Issue Commands Comment
         uses: peter-evans/find-comment@v3

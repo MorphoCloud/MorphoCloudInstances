@@ -160,9 +160,7 @@ runs:
       with:
         issue-number: ${{ inputs.issue_number }}
         body: |
-          ### Command Results ✅
-
-          `${{ inputs.command_name }}` command successfully applied to this issue.
+          `${{ inputs.command_name }}` command successfully applied to this issue ✅
 
     - name: command results comment (failure)
       if: ${{ failure() }}

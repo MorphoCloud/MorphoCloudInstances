@@ -137,6 +137,4 @@ runs:
       with:
         issue-number: ${{ inputs.issue_number }}
         body: |
-          ### Command Results ✅
-
-          Volume **${{ steps.define_volume_name.outputs.volume_name }}** successfully deleted.
+          Volume **${{ steps.define_volume_name.outputs.volume_name }}** successfully deleted ✅

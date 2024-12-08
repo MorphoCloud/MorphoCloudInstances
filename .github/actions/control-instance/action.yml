@@ -231,9 +231,7 @@ runs:
       with:
         issue-number: ${{ inputs.issue_number }}
         body: |
-          ### Command Results ✅
-
-          Instance **${{ steps.define.outputs.instance_name }}** successfully ${{ inputs.command_name }}d.
+          Instance **${{ steps.define.outputs.instance_name }}** successfully ${{ inputs.command_name }}d ✅
 
     - name: Update Request Status Label
       uses: ./.github/actions/update-request-status-label

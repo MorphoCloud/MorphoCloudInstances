@@ -515,6 +515,64 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+      - name: Reboot instance
+        id: reboot_instance
+        run: |
+          set +e
+
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -o LogLevel=ERROR \
+            exouser@$INSTANCE_IP \
+            'sudo shutdown -r now'
+
+          sleep 10
+          function check_instance_ready {
+            ssh \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              exouser@$INSTANCE_IP \
+              'true'
+          }
+
+          max_attempts=3
+          instance_ready=false
+          for attempt in $(seq 1 $max_attempts); do
+            echo "Checking if instance is ready ($attempt/$max_attempts)"
+            if check_instance_ready; then
+              instance_ready=true
+              echo "Instance '$INSTANCE_NAME' is ready."
+              break
+            else
+              echo "Instance '$INSTANCE_NAME' is not ready. Retrying in 5 seconds..."
+              sleep 10
+            fi
+          done
+          if ! $instance_ready; then
+            echo "::error ::Instance '$INSTANCE_NAME' is not ready after $max_attempts attempts to connect."
+            exit 1
+          fi
+          set -e
+        env:
+          INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+      - name: comment (failed to install Slicer extension dependencies)
+        if:
+          ${{ steps.slicer_install_extension_dependencies.outcome == 'failure'
+          && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to install Slicer extension dependencies on instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: Update Request Status Label
         id: update-request-status-label
         uses: ./.github/actions/update-request-status-label

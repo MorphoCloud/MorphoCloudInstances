@@ -1,0 +1,175 @@
+name: "Update Issue Description"
+description: "Update Issue Description"
+inputs:
+  issue_number:
+    description: "Issue number"
+    required: true
+  command_name:
+    description: "Name of the command to execute: encode_email, decode_email"
+    required: true
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Validate command
+      shell: bash
+      run: |
+        if [[ ! $COMMAND_NAME =~ ^encode_email|decode_email$ ]]; then
+          echo "::error ::Unknown command name 'COMMAND_NAME'. Valid commands are 'encode_email' or 'decode_email'."
+          exit 1
+        fi
+      env:
+        COMMAND_NAME: ${{ inputs.command_name }}
+
+    - name: Extract fields
+      id: extract
+      uses: ./.github/actions/extract-issue-fields
+      with:
+        token: ${{ inputs.token }}
+        repository: ${{ github.repository }}
+        issue_number: ${{ inputs.issue_number }}
+
+    - name: Check if email is encoded
+      id: check_email_encryption
+      shell: bash
+      run: |
+        if [[ "$EMAIL" != *"@"* ]]; then
+          encoded="true"
+        else
+          encoded="false"
+        fi
+        echo "encoded=$encoded" >> $GITHUB_OUTPUT
+      env:
+        EMAIL: ${{ steps.extract.outputs.email }}
+
+    - name: Encode email
+      id: encode_email
+      if: ${{ inputs.command_name == 'encode_email' }}
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "encode"
+        skip: ${{ steps.check_email_encryption.outputs.encoded == 'true' }}
+
+    - name: Decode email
+      id: decode_email
+      if: ${{ inputs.command_name == 'decode_email' }}
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "decode"
+        skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+    - name: Check if confirm email is encoded
+      id: check_confirm_email_encryption
+      shell: bash
+      run: |
+        if [[ "$EMAIL" != *"@"* ]]; then
+          encoded="true"
+        else
+          encoded="false"
+        fi
+        echo "encoded=$encoded" >> $GITHUB_OUTPUT
+      env:
+        CONFIRM_EMAIL: ${{ steps.extract.outputs.confirm_email }}
+
+    - name: Encode confirm email
+      id: encode_confirm_email
+      if: ${{ inputs.command_name == 'encode_email' }}
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.confirm_email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "encode"
+        skip:
+          ${{ steps.check_confirm_email_encryption.outputs.encoded == 'true' }}
+
+    - name: Decode confirm email
+      id: decode_confirm_email
+      if: ${{ inputs.command_name == 'decode_email' }}
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.confirm_email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "decode"
+        skip:
+          ${{ steps.check_confirm_email_encryption.outputs.encoded == 'false' }}
+
+    - name: Set updated email
+      id: set_updated_email
+      shell: bash
+      run: |
+        updated_email=""
+        updated_confirm_email=""
+        if [[ "$COMMAND_NAME" == "encode_email" ]]; then
+          updated_email="$ENCODED_EMAIL"
+          updated_confirm_email="$ENCODED_CONFIRM_EMAIL"
+        elif [[ "$COMMAND_NAME" == "decode_email" ]]; then
+          updated_email="$DECODED_EMAIL"
+          updated_confirm_email="$DECODED_CONFIRM_EMAIL"
+        fi
+        echo "updated_email=$updated_email" >> $GITHUB_OUTPUT
+        echo "updated_confirm_email=$updated_confirm_email" >> $GITHUB_OUTPUT
+      env:
+        COMMAND_NAME: ${{ inputs.command_name }}
+        ENCODED_EMAIL: ${{ steps.encode_email.outputs.output_string }}
+        ENCODED_CONFIRM_EMAIL:
+          ${{ steps.encode_confirm_email.outputs.output_string }}
+        DECODED_EMAIL: ${{ steps.decode_email.outputs.output_string }}
+        DECODED_CONFIRM_EMAIL:
+          ${{ steps.decode_confirm_email.outputs.output_string }}
+
+    - name: Update issue body
+      id: update_issue_body
+      shell: bash
+      run: |
+        gh issue view $ISSUE_NUMBER \
+          --repo $GH_REPO \
+          --json body \
+          --jq .body > ./body.md
+
+        # Replace email and confirm emails
+        sed \
+          -e "s#$OLD_EMAIL#$NEW_EMAIL#" \
+          -e "s#$OLD_CONFIRM_EMAIL#$NEW_CONFIRM_EMAIL#" \
+          ./body.md > ./updated_body.md
+
+        gh issue edit $ISSUE_NUMBER \
+          --repo $GH_REPO \
+          --body-file ./updated_body.md
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        OLD_EMAIL: ${{ steps.extract.outputs.email }}
+        NEW_EMAIL: ${{ steps.set_updated_email.outputs.updated_email }}
+        OLD_CONFIRM_EMAIL: ${{ steps.extract.outputs.confirm_email }}
+        NEW_CONFIRM_EMAIL:
+          ${{ steps.set_updated_email.outputs.updated_confirm_email }}
+
+    - name: command results comment (success)
+      if: ${{ success() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          `${{ inputs.command_name }}` command successfully applied to this issue ✅
+
+    - name: command results comment (failure)
+      if: ${{ failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to be applied to this issue.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -209,8 +209,15 @@ jobs:
 
           echo Creating instance "$INSTANCE_NAME"
 
-          # See https://jetstream2.exosphere.app/exosphere/helpabout
-          exoClientUuid=67296a2e-069b-49ca-9ca4-5dd296869ada
+          # The "Exosphere client UUID" is unique to each authenticated connection and is
+          # stored in the browser's local storage. It can be inspected at:
+          #   https://jetstream2.exosphere.app/exosphere/helpabout
+          # The associated code is located in the Exosphere project at:
+          #   src/LocalStorage/LocalStorage.elm
+          #
+          # The MorphCloud workflow uses a unique UUID generated with:
+          #   python3 -c "import uuid; print(uuid.uuid4())"
+          exoClientUuid=b7b75870-ecb5-4aca-ae73-49474a7f531e
 
           # See "currentExoServerVersion" in exosphere/src/Types/Server.elm
           exoServerVersion=5

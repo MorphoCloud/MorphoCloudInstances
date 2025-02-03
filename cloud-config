@@ -1,51 +1,91 @@
-#cloud-config
+Content-Type: multipart/mixed; boundary="===============2389165605550749110=="
+MIME-Version: 1.0
+Number-Attachments: 2
+
+--===============2389165605550749110==
+Content-Type: text/x-shellscript; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="part-001"
+
+#!/bin/bash
+set +e
+
+retry() {
+  local max_attempt=3
+  local attempt=0
+  while [ $attempt -lt $max_attempt ]; do
+    if "$@"; then
+      return 0
+    fi
+    echo "Command failed: $@"
+    attempt=$((attempt + 1))
+    if [ $attempt -lt $max_attempt ]; then
+      sleep 5
+    fi
+  done
+  echo "All retries of command failed: $@"
+  return 1
+}
+
+echo on > /proc/sys/kernel/printk_devkmsg || true  # Disable console rate limiting for distros that use kmsg
+sleep 1  # Ensures that console log output from any previous command completes before the following command begins
+echo '{"status":"running", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
+chmod 640 /var/log/cloud-init-output.log
+# {create-cluster-command}
+(which apt-get && retry apt-get install -y python3-venv) # Install python3-venv on Debian-based platforms
+(which yum     && retry yum install -y python3)      # Install python3 on RHEL-based platforms
+python3 -m venv /opt/ansible-venv
+. /opt/ansible-venv/bin/activate
+retry pip install --upgrade pip
+retry pip install ansible-core passlib
+retry pip install lxml # required by community.general.xml
+retry pip install  psutil # required by community.general.pids
+retry ansible-galaxy collection install community.general
+
+rm -rf /opt/instance-config-mgt
+
+# retry git clone \
+#   --depth=1 \
+#   --branch="{instance-config-mgt-repo-checkout}" \
+#   "{instance-config-mgt-repo-url}" \
+#   /opt/instance-config-mgt
+
+retry git clone \
+  "https://github.com/MorphoCloud/exosphere.git" \
+  /opt/instance-config-mgt
+
+exosphere_sha="af4d234cfec635df55bd0722ea5c7d79a10ac45c" # morpho-cloud-portal-2024.07.17-78a7e2d93
+(cd /opt/instance-config-mgt && git reset --hard $exosphere_sha)
+
+ansible-playbook \
+  -i /opt/instance-config-mgt/ansible/hosts \
+  -e "{\"guac_enabled\":true,\"gui_enabled\":true,\"ansible_python_interpreter\":\"/opt/ansible-venv/bin/python\"}" \
+  /opt/instance-config-mgt/ansible/playbook.yml
+ANSIBLE_RETURN_CODE=$?
+if [ $ANSIBLE_RETURN_CODE -eq 0 ]; then STATUS="complete"; else STATUS="error"; fi
+sleep 1  # Ensures that console log output from any previous commands complete before the following command begins
+echo '{"status":"'$STATUS'", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
+
+--===============2389165605550749110==
+Content-Type: text/cloud-config; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="part-002"
+
 users:
   - default
   - name: exouser
     shell: /bin/bash
     groups: sudo, admin
-    sudo: ['ALL=(ALL) NOPASSWD:ALL']
-    # {ssh-authorized-keys}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL'] # {ssh-authorized-keys}
     ssh-authorized-keys:
       - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAzSP8d9E0/iWqe/emHwYAiMF7EI9TTswoKRvKwP5qTe/djXL2kj0M+EfRf952D5agvnNXp4ldBDJwmvoZIs92Y+9GgAWBmkRwxH8e78p9rLlaZV4skGL1N+CIYi06eFHrQqn6h5qs0Dx710AAdL9jF6VZWvUnGvDDQ+/HnuKcNUtQT0S58tu0Cdn+LifX2WjesyjfxcUnjLpblz987Fiez7fmMGDnUDKqjdiwTAHyMVAff1QIvZ/pJeCfy0CcAgLkgeAaynmrVKIBjz6wyQk/5zV6Dum3/nkpZ/b6c+cou8UQeIDTiu9EPKLWSpz1UjgUxy9ZM009Vmqpw4f0WQaLXw== jchris.fillionr@kitware.com
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpad9EojP42y5JAVyeiHI+zlKgb3FGmXFLfJMUwmzsE morpho-cloud-portal_github-runner
 ssh_pwauth: true
 package_update: true
 package_upgrade: true # {install-os-updates}
-packages:
-  - git
+# packages:
 #  - git{write-files}
-runcmd:
-  - echo on > /proc/sys/kernel/printk_devkmsg || true  # Disable console rate limiting for distros that use kmsg
-  - sleep 1  # Ensures that console log output from any previous command completes before the following command begins
-  - >-
-    echo '{"status":"running", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
-  - chmod 640 /var/log/cloud-init-output.log
-#  - {create-cluster-command}
-  - (which apt-get && apt-get install -y python3-venv) # Install python3-venv on Debian-based platforms
-  - (which yum     && yum     install -y python3)      # Install python3 on RHEL-based platforms
-  - |-
-    python3 -m venv /opt/ansible-venv
-    . /opt/ansible-venv/bin/activate
-    pip install --upgrade pip
-    pip install ansible-core
-    pip install lxml # required by community.general.xml
-    pip install psutil # required by community.general.pids
-    ansible-galaxy collection install community.general
-    # --url "{instance-config-mgt-repo-url}"
-    # --checkout "{instance-config-mgt-repo-checkout}"
-    # -e "{ansible-extra-vars}"
-    rm -rf /opt/instance-config-mgt
-    exosphere_sha="e9d099b0caa480533b6654db81e84c49db302b7b" # morpho-cloud-portal-2024.07.17-78a7e2d93
-    ansible-pull \
-      --url "https://github.com/MorphoCloud/exosphere.git" \
-      --checkout "$exosphere_sha" \
-      --directory /opt/instance-config-mgt \
-      -i /opt/instance-config-mgt/ansible/hosts \
-      -e "{\"guac_enabled\":true,\"gui_enabled\":true,\"ansible_python_interpreter\":\"/opt/ansible-venv/bin/python\"}" \
-      /opt/instance-config-mgt/ansible/playbook.yml
-  - ANSIBLE_RETURN_CODE=$?
-  - if [ $ANSIBLE_RETURN_CODE -eq 0 ]; then STATUS="complete"; else STATUS="error"; fi
-  - sleep 1  # Ensures that console log output from any previous commands complete before the following command begins
-  - >-
-    echo '{"status":"'$STATUS'", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
+
+--===============2389165605550749110==--

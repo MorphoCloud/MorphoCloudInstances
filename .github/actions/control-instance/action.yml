@@ -198,6 +198,38 @@ runs:
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+    - name: Set MorphoCloud Client UUID
+      id: instance_client_uuid
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && success() &&
+        inputs.command_name == 'unshelve'}}
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+        # If unshelving an instance created before the MorphCloud workflow was
+        # associated with a unique UUID, the following ensures the instance is
+        # properly linked to the UUID specific to the MorphCloud workflow.
+        #
+        # The UUID below matches the one hardcoded in the "create-instance.yml"
+        # workflow.
+        exoClientUuid=b7b75870-ecb5-4aca-ae73-49474a7f531e
+        openstack server set --property "exoClientUuid=$exoClientUuid" $INSTANCE_NAME
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: comment (failed to set MorphoCloud client UUID)
+      if: ${{ steps.instance_client_uuid.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          Failed to set MorphoCloud client UUID while unshelving.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
     - name: Send email
       id: send_email
       if:

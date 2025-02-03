@@ -573,17 +573,43 @@ jobs:
           INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
-      - name: comment (failed to install Slicer extension dependencies)
-        if:
-          ${{ steps.slicer_install_extension_dependencies.outcome == 'failure'
-          && failure() }}
+      - name: comment (failed to reboot instance)
+        if: ${{ steps.reboot_instance.outcome == 'failure' && failure() }}
         uses: peter-evans/create-or-update-comment@v4.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
             ### Instance Creation Results ❌
 
-            Failed to install Slicer extension dependencies on instance **${{ steps.define.outputs.instance_name }}**.
+            Failed to reboot instance **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Set instance properties
+        id: set_instance_properties
+        run: |
+          source ~/venv/bin/activate
+
+          # Explicitly set status to complete
+          exoSetup='{"status":"complete", "epoch": '$(date '+%s')'000}'
+
+          openstack server set \
+              --property "exoSetup=$exoSetup" \
+            $INSTANCE_NAME
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+      - name: comment (failed to set instance properties)
+        if:
+          ${{ steps.set_instance_properties.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Instance Creation Results ❌
+
+            Failed to set instance **${{ steps.define.outputs.instance_name }}** properties.
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

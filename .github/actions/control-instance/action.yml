@@ -213,16 +213,7 @@ runs:
         # The UUID below matches the one hardcoded in the "create-instance.yml"
         # workflow.
         exoClientUuid=b7b75870-ecb5-4aca-ae73-49474a7f531e
-
-        epoch=$(date '+%s')
-        exoSetup="{\"status\":\"timeout\",\"epoch\":1737874479537}"
-
-        echo '{"status":"'$STATUS'", "epoch": '$(date '+%s')'000}'
-
-        openstack server set \
-            --property "exoClientUuid=$exoClientUuid" \
-            --property "exoSetup=$exoSetup" \
-          $INSTANCE_NAME
+        openstack server set --property "exoClientUuid=$exoClientUuid" $INSTANCE_NAME
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}

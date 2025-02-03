@@ -352,6 +352,13 @@ jobs:
               exit 1
           fi
 
+          # Explicitly set status to "complete"
+          exoSetup='{"status":"complete", "epoch": '$(date '+%s')'000}'
+
+          openstack server set \
+              --property "exoSetup=$exoSetup" \
+            $INSTANCE_NAME
+
           echo "status=$status" >> $GITHUB_OUTPUT
         env:
           OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}

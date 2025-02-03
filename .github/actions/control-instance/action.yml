@@ -198,8 +198,8 @@ runs:
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-    - name: Set MorphoCloud Client UUID
-      id: instance_client_uuid
+    - name: Set instance properties
+      id: set_instance_properties
       if:
         ${{ steps.check_instance.outputs.exists == 'true' && success() &&
         inputs.command_name == 'unshelve'}}
@@ -213,20 +213,29 @@ runs:
         # The UUID below matches the one hardcoded in the "create-instance.yml"
         # workflow.
         exoClientUuid=b7b75870-ecb5-4aca-ae73-49474a7f531e
-        openstack server set --property "exoClientUuid=$exoClientUuid" $INSTANCE_NAME
+
+        epoch=$(date '+%s')
+        exoSetup="{\"status\":\"timeout\",\"epoch\":1737874479537}"
+
+        echo '{"status":"'$STATUS'", "epoch": '$(date '+%s')'000}'
+
+        openstack server set \
+            --property "exoClientUuid=$exoClientUuid" \
+            --property "exoSetup=$exoSetup" \
+          $INSTANCE_NAME
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
-    - name: comment (failed to set MorphoCloud client UUID)
-      if: ${{ steps.instance_client_uuid.outcome == 'failure' && failure() }}
+    - name: comment (failed to set instance properties)
+      if: ${{ steps.set_instance_properties.outcome == 'failure' && failure() }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
         body: |
           ### Command Results ❌
 
-          Failed to set MorphoCloud client UUID while unshelving.
+          Failed to set instance properties while unshelving.
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

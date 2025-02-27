@@ -1,0 +1,92 @@
+name: Automatic Instance Deleting
+on:
+  schedule:
+    # Run once per day
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ vars.MORPHOCLOUD_OS_CLOUD }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  auto-delete:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@31c86eb3b33c9b601a1f60f98dcbfd1d70f379b4 # v1.10.3
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Retrieve and process instance deletion candidates
+        run: |
+          source ~/venv/bin/activate
+
+          instance_prefix=${PREFIX:+${PREFIX}_}
+          instance_basename="${instance_prefix}instance"
+
+          # Retrieve all instances matching the basename pattern
+          openstack server list --name "^${instance_basename}-\\d+" -f json | \
+          jq -c '.[]' | while read -r instance_json; do
+            instance_name=$(echo "$instance_json" | jq -r '.Name')
+
+            # Extract the issue number from the instance name
+            issue_number=${instance_name##*-}  # Extract issue number
+
+            # Retrieve issue creation date from GitHub
+            issue_json=$(gh issue view "$issue_number" --json createdAt)
+            created_at=$(echo "$issue_json" | jq -r '.createdAt')
+
+            # Convert ISO 8601 timestamp to epoch time
+            created_at_epoch=$(date -d "$created_at" +%s)
+
+            current_time_epoch=$(date +%s)
+            lifespan_days=$(( (current_time_epoch - created_at_epoch) / 86400 ))
+
+            # Retrieve issue labels
+            issue_json=$(gh issue view "$issue_number" --json labels)
+            labels=$(echo "$issue_json" | jq -r '.labels[].name')
+
+            # Retrieve lifespan values from labels
+            lifespan_list=$(echo "$labels" | grep -oP '(?<=expiration:)\d+(\.\d+)?' | sort -n)
+            max_lifespan=$(echo "$lifespan_list" | tail -n1)
+
+            # Skip if issue is not associated with any "expiration" labels.
+            if [[ -n "$lifespan_list" ]]; then
+              # Retrieve renewal values from labels.
+              renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1)
+              renewed_count=${renewed_count:-0}  # Default to 0 if not found
+
+              # Compute expiration time
+              expiration_days=$(echo "$lifespan_list" | sed -n "$((renewed_count + 1))p")
+              expiration_days=${expiration_days:-0}
+              expiration_time_epoch=$((created_at_epoch + expiration_days * 86400))
+              days_until_expiration=$(( (expiration_time_epoch - current_time_epoch) / 86400 ))
+
+              echo "Instance: [$instance_name], Created: [$created_at], Lifespan: [$lifespan_days days], Expiration: [$expiration_days days], Days left: [$days_until_expiration]"
+
+              if [[ "$days_until_expiration" -le 0 ]]; then
+                echo "Instance ${instance_name} has expired. Deleting..."
+                # gh issue comment "$issue_number" --body "/delete_all"
+              elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
+                echo "Instance ${instance_name} will expire soon. Sending warning..."
+                gh issue comment "$issue_number" \
+                  --body "⚠️ Your instance will be deleted in $days_until_expiration days. Request an extension using the `\renew` command if needed."
+              fi
+            else
+              echo "Skipping Instance $instance_name. Not associated with any 'expiration' labels. Created: [$created_at], Lifespan: [$lifespan_days days]"
+            fi
+          done
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}
+          EXPIRATION_WARNING_DAYS: 7

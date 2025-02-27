@@ -1,0 +1,102 @@
+name: Process /renew Command
+
+on:
+  issue_comment:
+    types: [created]
+
+# Permissions needed for reacting to IssueOps commands on issues
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  update-issue:
+    runs-on: ubuntu-latest
+    if:
+      ${{ !github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/renew')}}
+    steps:
+      - name: renew command
+        id: renew_command
+        uses: github/command@v1.2.0
+        with:
+          command: "/renew"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
+
+      - uses: actions/checkout@v4
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Update renew label
+        if: ${{ steps.renew_command.outputs.continue == 'true' }}
+        id: update_renew_label
+        run: |
+          # Retrieve issue labels
+          issue_json=$(gh issue view "$ISSUE_NUMBER" --json labels)
+          labels=$(echo "$issue_json" | jq -r '.labels[].name')
+
+          # Extract expiration labels (e.g., expiration:60d, expiration:120d)
+          lifespan_list=$(echo "$labels" | grep -oP '(?<=expiration:)\d+(\.\d+)?' | sort -n)
+
+          # Count available expiration labels
+          expiration_count=$(echo "$lifespan_list" | wc -l)
+
+          # If no expiration labels exist, notify user and exit
+          if [[ -z "$lifespan_list" ]]; then
+            echo "Skipping issue $ISSUE_NUMBER update: No 'expiration' labels found."
+            gh issue comment "$ISSUE_NUMBER" --body "⚠️ This instance is not associated with any expiration policy and cannot be renewed."
+            exit 0
+          fi
+
+          # Retrieve the highest existing renewal count (e.g., renewed:1, renewed:2)
+          renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1)
+          renewed_count=${renewed_count:-0}  # Default to 0 if not found
+
+          # Increment renewal count
+          renewed_count=$((renewed_count + 1))
+
+          # If renewed_count exceeds available expiration labels, deny renewal
+          if [[ "$renewed_count" -ge "$expiration_count" ]]; then
+            gh issue comment "$ISSUE_NUMBER" \
+              --body "❌ Renewal request denied: Maximum allowed extensions reached."
+            echo "Skipping renewal for issue $ISSUE_NUMBER: No more expiration extensions available."
+            exit 0
+          fi
+
+          # Define the new renewal label (e.g., renewed:1 → renewed:2)
+          add_label="renewed:$renewed_count"
+
+          # Find and remove existing renewal labels (to replace with updated count)
+          remove_labels=$(gh issue view $ISSUE_NUMBER --json labels | \
+            jq -r -c '[.labels[].name | select(test("^renewed:")?)] | join(",")')
+
+          echo "Updating issue $ISSUE_NUMBER adding label [$add_label] and removing labels [$remove_labels]"
+
+          # Apply the label updates in GitHub
+          gh issue edit ${ISSUE_NUMBER} --add-label "${add_label}" --remove-label "${remove_labels}"
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: command results comment (failed)
+        if: ${{ steps.update_renew_label.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `renew` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

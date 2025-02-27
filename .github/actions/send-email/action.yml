@@ -127,6 +127,7 @@ runs:
           - `/encode_email`: Update issue description obfuscating emails
           - `/decode_email`: Update issue description deobfuscating emails
           - `/email`: Send this email with connection URL
+          - `/renew`: Extend the instance lifespan if additional time is available.
 
     - name: Set error message
       id: set_error_message

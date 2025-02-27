@@ -116,6 +116,124 @@ runs:
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+    - name: Check if instance has a floating IP
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' &&
+        (inputs.command_name == 'unshelve' || inputs.command_name == 'shelve')
+        }}
+      id: check_instance_has_ip
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        # Get instance IP
+        instance_ip=$(
+          openstack server show $INSTANCE_NAME -c addresses -f json | \
+          jq -r '.addresses.auto_allocated_network | if length > 1 then .[1] else "" end'
+        )
+        echo "instance_ip [$instance_ip]"
+
+        # Determine if instance already has a floating IP assigned
+        if [[ -n "$instance_ip" ]]; then
+          has_ip="true"
+        else
+          has_ip="false"
+        fi
+        echo "has_ip [$has_ip]"
+        echo "has_ip=$has_ip" >> $GITHUB_OUTPUT
+
+        # Check if an unassigned floating IP matches instance IP
+        has_ip_assigned="false"
+        if [[ "$has_ip" == "true" ]]; then
+          json_output=$(openstack floating ip list -f json | jq --arg ip "$instance_ip" 'map(select(.Port != null and ."Floating IP Address" == $ip))')
+          floating_ip_address=$(echo "$json_output" | jq -r 'if length > 0 then .[0]["Floating IP Address"] else "" end')
+
+          if [[ -n "$floating_ip_address" ]]; then
+            has_ip_assigned="true"
+          fi
+        fi
+
+        # If previously assigned IP is not available anymore, discard it.
+        if [[ "$has_ip_assigned" == "false" ]]; then
+          instance_ip=""
+        fi
+
+        echo "instance_ip [$instance_ip]"
+        echo "instance_ip=$instance_ip" >> $GITHUB_OUTPUT
+
+        echo "has_ip_assigned [$has_ip_assigned]"
+        echo "has_ip_assigned=$has_ip_assigned" >> $GITHUB_OUTPUT
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: comment (failed to check instance IP)
+      if: ${{ steps.check_instance_has_ip.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+          Failed to check if instance is associated with a floating IP.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Retrieve or create a floating IP
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
+        == 'unshelve' && steps.check_instance_has_ip.outputs.has_ip_assigned ==
+        'false' }}
+      id: ip_create
+      uses: ./.github/actions/create-ip
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        preferred_ip_address:
+          ${{ steps.check_instance_has_ip.outputs.instance_ip }}
+
+    - name: comment (failed to retrieve or create floating IP)
+      if: ${{ steps.ip_create.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+          Failed to retrieve or create a floating IP.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Associate floating IP with unshelved instance
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
+        == 'unshelve' && steps.check_instance_has_ip.outputs.has_ip_assigned ==
+        'false' }}
+      id: associate_ip
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        openstack server add floating ip "$INSTANCE_NAME" "$FLOATING_IP_ADDRESS"
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        FLOATING_IP_ADDRESS: ${{ steps.ip_create.outputs.floating_ip_address }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: comment (failed to associate floating IP with unshelved instance)
+      if: ${{ steps.associate_ip.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+          Failed to associate floating IP with unshelved instance.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
     - name: Execute command
       id: execute_command
       if: ${{ steps.check_instance.outputs.exists == 'true' }}
@@ -195,6 +313,36 @@ runs:
           ### Command Results ❌
 
           Maximum wait time for command `${{ inputs.command_name }}` command to complete exceeded.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Disassociate floating IP from shelved instance
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
+        == 'shelve' && steps.check_instance_has_ip.outputs.has_ip == 'true' &&
+        steps.check_instance_has_ip.outputs.has_ip_assigned == 'true' }}
+      id: disassociate_ip
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        openstack server remove floating ip "$INSTANCE_NAME" "$FLOATING_IP_ADDRESS"
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        FLOATING_IP_ADDRESS:
+          ${{ steps.check_instance_has_ip.outputs.instance_ip }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: comment (failed to disassociate floating IP from unshelved instance)
+      if: ${{ steps.disassociate_ip.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `${{ inputs.command_name }}` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance.
+          Failed to disassociate floating IP from unshelved instance.
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

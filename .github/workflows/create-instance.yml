@@ -95,29 +95,11 @@ jobs:
         env:
           INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
-      - name: Create floating IP
+      - name: Retrieve or create floating IP
         id: ip_create
-        run: |
-          source ~/venv/bin/activate
-
-          json_output=$(openstack floating ip create public -f json)
-          echo $json_output
-
-          floating_ip_uuid=$(
-            echo $json_output |
-            jq -r ".id"
-          )
-          echo "floating_ip_uuid [$floating_ip_uuid]"
-          echo "floating_ip_uuid=$floating_ip_uuid" >> $GITHUB_OUTPUT
-
-          floating_ip_address=$(
-            echo $json_output |
-            jq -r ".floating_ip_address"
-          )
-          echo "floating_ip_address [$floating_ip_address]"
-          echo "floating_ip_address=$floating_ip_address" >> $GITHUB_OUTPUT
-        env:
-          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+        uses: ./.github/actions/create-ip
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
 
       - name: comment (floating IP creation failed)
         if: ${{ steps.ip_create.outcome == 'failure' && failure() }}

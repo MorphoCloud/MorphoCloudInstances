@@ -18,7 +18,12 @@ jobs:
         [
           {"name": "flavor:g3.xl", "color": "D93F0B", "description": "GPU instance (32 CPUs, 125 GB RAM, A100 GPU)"},
           {"name": "flavor:m3.xl", "color": "D93F0B", "description": "General-purpose instance (32 CPUs, 125 GB RAM)"},
+          {"name": "expiration:60d", "color": "892368", "description": "Instance expires in 60 days unless extended"},
+          {"name": "expiration:120d", "color": "892368", "description": "Instance expires in 120 days unless extended"},
+          {"name": "expiration:180d", "color": "892368", "description": "Instance expires in 180 days unless extended"},
           {"name": "request:approved", "color": "027210", "description": "Instance has been approved for creation and is being provisioned"},
+          {"name": "renewed:1", "color": "1550D4", "description": "Instance lifespan renewed once"},
+          {"name": "renewed:2", "color": "1550D4", "description": "Instance lifespan renewed twice"},
           {"name": "status:active", "color": "CFD3D7", "description": "The server is active."},
           {"name": "status:build", "color": "CFD3D7", "description": "The server has not yet finished the original build process."},
           {"name": "status:deleted", "color": "CFD3D7", "description": "The server is deleted."},

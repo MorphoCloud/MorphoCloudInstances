@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/MorphoCloud/MorphoCloudInstances/main/MC_Logo.png" alt="SlicerMorph on the cloud">
+<img src="https://raw.githubusercontent.com/MorphoCloud/MorphoCloudInstances/main/MC_Logo.png" alt="SlicerMorph on the cloud" width="512">
 
 # MorphoCloud On-Demand Instances: Run SlicerMorph inside a web browser.
 

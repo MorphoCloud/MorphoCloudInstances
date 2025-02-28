@@ -1,0 +1,137 @@
+name: Send Renewal Email
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+      days_until_expiration:
+        description: "Number of days before deletion"
+        required: true
+
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  send-renewal-email:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          issue_number: ${{ inputs.issue_number }}
+
+      - name: Check instance exists
+        id: check_instance
+        uses: ./.github/actions/check-instance-exists
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+
+      - name: command results comment (Instance does not exist)
+        if: ${{ steps.check_instance.outputs.exists == 'false' }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ inputs.issue_number }}
+          body: |
+            ❌ **Renewal email not sent**: Instance **${{ steps.define_instance.outputs.instance_name }}** does not exist.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Define volume name
+        id: define_volume_name
+        uses: ./.github/actions/define-volume-name
+        with:
+          issue_number: ${{ inputs.issue_number }}
+          suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
+
+      - name: Extract fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ inputs.issue_number }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
+        shell: bash
+        run: |
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+      - name: Send renewal email
+        id: send_email
+        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: MorphoCloudPortal
+          to: ${{ steps.decode_email.outputs.output_string }}
+          subject:
+            "[${{ github.event.repository.name }}] Instance ${{
+            steps.define.outputs.instance_name }} and Volume ${{
+            steps.define_volume_name.outputs.volume_name }} Scheduled for
+            Deletion"
+          convert_markdown: true
+          html_body: |
+            ## 🚨 Urgent: Your MorphoCloud Instance & Volume Will Be Deleted in ${{ inputs.days_until_expiration }} Days
+
+            Your MorphoCloud instance **${{ steps.define.outputs.instance_name }}** and its associated volume **${{ steps.define_volume_name.outputs.volume_name }}** are scheduled for **permanent deletion** in **${{ inputs.days_until_expiration }}** days.
+
+            **This action is irreversible.** If you need to retain your instance and volume, you **must renew before the deadline** by commenting `/renew` on [Issue #${{ inputs.issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.issue_number }}).
+
+            ## 🔄 How to Renew
+            1️⃣ Open [Issue #${{ inputs.issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.issue_number }})
+            2️⃣ Add a new comment: **`/renew`**
+            3️⃣ If additional lifespan is available, your instance will be extended.
+
+            **🔴 If no renewal is requested, your instance and volume will be permanently deleted in ${{ inputs.days_until_expiration }} days.**
+
+            ## ❓ Need Help?
+
+            Contact us at [morphocloud@outlook.com](mailto:morphocloud@outlook.com) if you have any questions.
+
+            **⏳ Time is running out! If you wish to keep your instance and volume, comment `/renew` now!**
+
+      - name: command results comment (failed)
+        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ inputs.issue_number }}
+          body: |
+            ❌ Failed to send renewal email for **${{ steps.define.outputs.instance_name }}**.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: command results comment (success)
+        if: ${{ steps.send_email.outcome == 'success' && success() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ inputs.issue_number }}
+          body: |
+            ✅ Successfully sent renewal email for **${{ steps.define.outputs.instance_name }}**.

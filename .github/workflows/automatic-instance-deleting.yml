@@ -74,11 +74,23 @@ jobs:
 
               if [[ "$days_until_expiration" -le 0 ]]; then
                 echo "Instance ${instance_name} has expired. Deleting..."
-                # gh issue comment "$issue_number" --body "/delete_all"
+                gh issue comment "$issue_number" --body "/delete_all"
               elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
                 echo "Instance ${instance_name} will expire soon. Sending warning..."
                 gh issue comment "$issue_number" \
-                  --body "⚠️ Your instance will be deleted in $days_until_expiration days. Request an extension using the `\renew` command if needed."
+                  --body '⚠️ Instance and volume will be deleted in '"$days_until_expiration"' days. Request an extension using the `renew` command if needed.'
+                set +e
+                gh workflow run send-renewal-email.yml \
+                  -f issue_number=$issue_number \
+                  -f days_until_expiration=$days_until_expiration
+                error_code=$?
+                set -e
+                if [[ $error_code -ne 0 ]]; then
+                  echo "::warning ::Failed to run workflow for sending $instance_name renewal email"
+                  gh issue comment "$issue_number" \
+                    --body "❌ Failed to send renewal email. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  continue
+                fi
               fi
             else
               echo "Skipping Instance $instance_name. Not associated with any 'expiration' labels. Created: [$created_at], Lifespan: [$lifespan_days days]"

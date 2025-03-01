@@ -1,0 +1,162 @@
+name: Automatic Volume Deleting
+on:
+  schedule:
+    # Run once per day
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      expiration_graceperiod_days:
+        description: "Expiration Grace Period in days (default: 14)"
+        type: number
+
+concurrency:
+  group: ${{ github.workflow }}-${{ vars.MORPHOCLOUD_OS_CLOUD }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  auto-delete:
+    runs-on: self-hosted
+    steps:
+      - name: Collect Inputs
+        id: collect_inputs
+        run: |
+          echo "EVENT_NAME [$EVENT_NAME]"
+
+          # Default value
+          expiration_graceperiod_days=14
+
+          # If manually triggered, check if an input was provided
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "${{ github.event.inputs.expiration_graceperiod_days }}" ]]; then
+            input_days="${{ github.event.inputs.expiration_graceperiod_days }}"
+
+            # Validate that input_days is a positive integer
+            if [[ "$input_days" =~ ^[0-9]+$ && "$input_days" -ge 0 ]]; then
+              expiration_graceperiod_days=$input_days
+            else
+              echo "⚠️ Invalid input for expiration_graceperiod_days: [$input_days]. Using default: [$expiration_graceperiod_days]"
+            fi
+          fi
+
+          echo "expiration_graceperiod_days [$expiration_graceperiod_days]"
+          echo "expiration_graceperiod_days=$expiration_graceperiod_days" >> $GITHUB_OUTPUT
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@31c86eb3b33c9b601a1f60f98dcbfd1d70f379b4 # v1.10.3
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Retrieve and process volume deletion candidates
+        run: |
+          source ~/venv/bin/activate
+
+          volume_basename="My-Data"
+          volume_suffix=${SUFFIX:+-${SUFFIX}}
+
+          echo "Fetching available volumes matching pattern: ${volume_basename}-NNN${volume_suffix}"
+
+          # Retrieve all matching volumes
+          # Filtering is done afterward because specifying the openstack parameter
+          # `--name "^${volume_basename}-\\d+${volume_suffix}$"` was not working and
+          # output was empty.
+          openstack volume list --status "available" -f json | \
+          jq -c --arg regex "^${volume_basename}-\\d+${volume_suffix}$" \
+            '.[] | select(.Name | test($regex))' | while read -r volume_json; do
+
+            # Extract volume details
+            volume_id=$(echo "$volume_json" | jq -r '.ID')
+            volume_name=$(echo "$volume_json" | jq -r '.Name')
+
+            echo "Processing volume: ID [$volume_id], Name [$volume_name]"
+
+            # Extract the issue number from the volume name (e.g., My-Data-123 → 123)
+            issue_number=$(echo "$volume_name" | grep -oP '(?<=My-Data-)\d+')
+            if [[ -z "$issue_number" ]]; then
+              echo "⚠️ Skipping volume [$volume_name]: Could not extract issue number."
+              continue
+            fi
+
+            echo "→ Extracted issue number: [$issue_number]"
+
+            # Retrieve time at which the label `volume:expiration-pending` was last added
+            labeled_at=$(gh api graphql -F owner='{owner}' -F name='{repo}' -F issue_number="$issue_number" -f query='
+            query($owner: String!, $name: String!, $issue_number: Int!) {
+              repository(owner: $owner, name: $name) {
+                issue(number: $issue_number) {
+                  timelineItems(last: 100, itemTypes: [LABELED_EVENT]) {
+                    edges {
+                      node {
+                        ... on LabeledEvent {
+                          createdAt
+                          label {
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }' | jq -r '
+              .data.repository.issue.timelineItems.edges |
+              map(.node) |
+              map(select(.label.name == "volume:expiration-pending")) |
+              sort_by(.createdAt) |
+              reverse | .[0].createdAt // ""')
+
+            if [[ -z "$labeled_at" ]]; then
+              echo "⚠️ No 'volume:expiration-pending' label found for issue [$issue_number]. Skipping."
+              continue
+            fi
+
+            echo "→ Found label 'volume:expiration-pending' added at: [$labeled_at]"
+
+            # Convert ISO 8601 timestamp to epoch time
+            labeled_at_epoch=$(date -d "$labeled_at" +%s 2>/dev/null || echo "")
+
+            if [[ -z "$labeled_at_epoch" ]]; then
+              echo "⚠️ Failed to parse timestamp for volume [$volume_name]. Skipping."
+              continue
+            fi
+
+            current_time_epoch=$(date +%s)
+            days_since_labeled=$(( (current_time_epoch - labeled_at_epoch) / 86400 ))
+
+            echo "→ Days since 'volume:expiration-pending' label: [$days_since_labeled]"
+
+            # Compute expiration time
+            days_until_expiration=$(( EXPIRATION_GRACEPERIOD_DAYS - days_since_labeled ))
+
+            if [[ "$days_until_expiration" -le 0 ]]; then
+              echo "🚨 Volume ${volume_name} has expired. Deleting..."
+              gh workflow run delete-volume-from-workflow.yml \
+                -f issue_number=$issue_number
+                error_code=$?
+              set -e
+              if [[ $error_code -ne 0 ]]; then
+                echo "::warning ::Failed to run workflow for deleting $volume_name."
+                gh issue comment "$issue_number" \
+                  --body "❌ Failed to delete volume <tt>$volume_name</tt>. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                continue
+              fi
+              gh issue edit "$issue_number" --remove-label "volume:expiration-pending"
+            else
+              echo "ℹ️ Volume [$volume_name] still has [$days_until_expiration] days before deletion."
+            fi
+
+          done
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          SUFFIX: ${{ vars.VOLUME_NAME_SUFFIX }}
+          EXPIRATION_GRACEPERIOD_DAYS:
+            ${{ steps.collect_inputs.outputs.expiration_graceperiod_days }}

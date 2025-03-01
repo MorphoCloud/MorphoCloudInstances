@@ -6,6 +6,9 @@ inputs:
       "Name of the OpenStack cloud allocation to select openstack auth settings
       defined in '.config/openstack/clouds.yaml'"
     required: true
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
   issue_number:
     description: "Issue number"
     required: true
@@ -115,8 +118,13 @@ runs:
         echo "volume_id [$volume_id]"
 
         openstack volume delete $volume_id
+
+        gh issue edit $ISSUE_NUMBER --add-label "volume:deleted"
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
         VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
 
     - name: comment (failed to delete volume)

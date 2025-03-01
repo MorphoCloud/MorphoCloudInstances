@@ -1,0 +1,44 @@
+name: Delete Volume from Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: number
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: number
+permissions:
+  issues: write
+  checks: read
+
+jobs:
+  control:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add comment
+        run: |
+          gh issue comment $ISSUE_NUMBER \
+            -b "<tt>\delete_volume</tt> issued by **delete-volume-from-workflow.yml** workflow. \
+            See details [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+
+      - name: Delete volume
+        id: delete_volume
+        uses: ./.github/actions/delete-volume
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue_number: ${{ inputs.issue_number }}
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          volume_name_suffix: ${{ vars.VOLUME_NAME_SUFFIX }}

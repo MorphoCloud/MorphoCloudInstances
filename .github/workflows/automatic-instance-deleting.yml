@@ -74,7 +74,20 @@ jobs:
 
               if [[ "$days_until_expiration" -le 0 ]]; then
                 echo "Instance ${instance_name} has expired. Deleting..."
-                gh issue comment "$issue_number" --body "/delete_all"
+                set +e
+                gh workflow run control-instance-from-workflow.yml \
+                  -f issue_number=$issue_number \
+                  -f command_name=delete
+                  error_code=$?
+                set -e
+                if [[ $error_code -ne 0 ]]; then
+                  echo "::warning ::Failed to run workflow for deleting $instance_name."
+                  gh issue comment "$issue_number" \
+                    --body "❌ Failed to delete instance. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  continue
+                fi
+                gh issue edit $issue_number --add-label "volume:expiration-pending"
+
               elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
                 echo "Instance ${instance_name} will expire soon. Sending warning..."
                 gh issue comment "$issue_number" \

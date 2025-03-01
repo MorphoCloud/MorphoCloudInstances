@@ -29,6 +29,7 @@ jobs:
         uses: ./.github/actions/delete-volume
         with:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           volume_name_suffix: ${{ vars.VOLUME_NAME_SUFFIX }}

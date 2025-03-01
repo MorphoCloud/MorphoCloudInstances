@@ -40,7 +40,7 @@ jobs:
         with:
           issue-number: ${{ inputs.issue_number }}
           body: |
-            ❌ **Renewal email not sent**: Instance **${{ steps.define_instance.outputs.instance_name }}** does not exist.
+            ❌ **Renewal email not sent**: Instance **${{ steps.define.outputs.instance_name }}** does not exist.
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 

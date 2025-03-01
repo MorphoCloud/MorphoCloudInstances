@@ -44,7 +44,9 @@ jobs:
           {"name": "status:suspended", "color": "CFD3D7", "description": "The server is suspended, either by request or necessity."},
           {"name": "status:unknown", "color": "CFD3D7", "description": "The state of the server is unknown."},
           {"name": "status:verify_resize", "color": "CFD3D7", "description": "System is awaiting confirmation that the server is operational after a move or resize."},
-          {"name": "timeout:4hrs", "color": "5319E7", "description": "Duration in hours after which the instance will be stopped"}
+          {"name": "timeout:4hrs", "color": "5319E7", "description": "Duration in hours after which the instance will be stopped"},
+          {"name": "volume:deleted", "color": "0E8CDB", "description": "The volume has been permanently deleted after the grace period."},
+          {"name": "volume:expiration-pending", "color": "0E8CDB", "description": "The volume is detached and will be deleted after the grace period."}
         ]
     steps:
       - name: Create or Update Labels

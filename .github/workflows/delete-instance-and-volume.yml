@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: delete_instance_and_volume command
         id: delete_instance_and_volume_command
-        uses: github/command@v1.2.0
+        uses: github/command@v2.0.0
         with:
           command: "/delete_all"
           reaction: "rocket"

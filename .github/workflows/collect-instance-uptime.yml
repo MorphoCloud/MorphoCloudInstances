@@ -185,7 +185,7 @@ jobs:
           JSON_DIR: ${{ steps.define-metadata.outputs.directory }}
 
       - name: Publish
-        uses: s0/git-publish-subdir-action@61eb9e6420447e7cbf010f7cce37103665c46bfa # develop
+        uses: s0/git-publish-subdir-action@ac113f6bfe8896e85a373534242c949a7ea74c98 # develop
         env:
           REPO: self
           BRANCH: ${{ steps.define-metadata.outputs.branch }}

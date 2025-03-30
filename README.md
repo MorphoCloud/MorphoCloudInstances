@@ -26,6 +26,16 @@ Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
 click **Get Started** and fill in the issue template. Your request will be
 approved within 24h (often faster).
 
+## MorphoCloud Desktop
+
+**A:** Shortcuts to commonly used tools and applications. From left to right, minimize/maximize open applications, 3D Slicer, Terminal (aka shell console) window, File Browser, Firefox web browser, Application Search, File Browser. </br>
+**B:** Right mouse clicking anywhere on desktop brings this menu, which lists all the applications and settings. </br>
+**C:** Shortcut to your persistent storage volume, **MyData**. The actual folder is /media/volume/MyData. </br>
+**D:** Side toolbar that gets activated by pressing the `CTRL (or CMD)` + `ALT` + `SHIFT` keys. It allows copy/paste into the remote session, browse and download files on the remote drive and adjust screen zoom levels (cut from the screenshot). </br>
+**E:** Click on this icon anytime to extend your session for additional 4 hours. </br>
+<img src="https://github.com/MorphoCloud/MorphoCloudInstances/blob/main/MCI_Desktop.png" width=1000>
+
+
 ## JetStream2 Operational Status
 
 <a href="https://jetstream.status.io/" target="_blank" rel="noopener noreferrer">

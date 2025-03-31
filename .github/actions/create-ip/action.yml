@@ -26,15 +26,20 @@ runs:
         echo "$json_output" | jq
 
         if [[ -n "${{ inputs.preferred_ip_address }}" ]]; then
-          floating_ip_address=$(echo "$json_output" | jq -r --arg ip "${{ inputs.preferred_ip_address }}" \
-            'map(select(."Floating IP Address" == $ip)) | if length > 0 then .[0]["Floating IP Address"] else "" end')
+          floating_ip=$(echo "$json_output" | jq -r --arg ip "${{ inputs.preferred_ip_address }}" \
+            'map(select(."Floating IP Address" == $ip)) | if length > 0 then .[0] else null end')
         else
-          floating_ip_address=$(echo "$json_output" | jq -r 'if length > 0 then .[0]["Floating IP Address"] else "" end')
+          floating_ip=$(echo "$json_output" | jq -r 'if length > 0 then .[0] else null end')
         fi
 
-        floating_ip_address=$(echo "$json_output" | jq -r 'if length > 0 then .[0]["Floating IP Address"] else "" end')
+        floating_ip_address=$(echo "$floating_ip" | jq -r '."Floating IP Address" // empty')
+        floating_ip_uuid=$(echo "$floating_ip" | jq -r '."ID" // empty')
+
         echo "floating_ip_address [$floating_ip_address]"
         echo "floating_ip_address=$floating_ip_address" >> $GITHUB_OUTPUT
+
+        echo "floating_ip_uuid [$floating_ip_uuid]"
+        echo "floating_ip_uuid=$floating_ip_uuid" >> $GITHUB_OUTPUT
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
 

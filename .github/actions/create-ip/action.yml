@@ -74,17 +74,24 @@ runs:
       id: define_output
       shell: bash
       run: |
-        echo "RETRIEVED_FLOATING_IP [$RETRIEVED_FLOATING_IP]"
-        echo "CREATED_IP [$CREATED_IP]"
-        if [[ -n "$RETRIEVED_FLOATING_IP" ]]; then
-          echo "floating_ip_address=$RETRIEVED_FLOATING_IP" >> $GITHUB_OUTPUT
-        elif [[ -n "$CREATED_IP" ]]; then
-          echo "floating_ip_address=$CREATED_IP" >> $GITHUB_OUTPUT
+        echo "RETRIEVED_FLOATING_IP_ADDRESS [$RETRIEVED_FLOATING_IP_ADDRESS]"
+        echo "RETRIEVED_FLOATING_IP_UUID [$RETRIEVED_FLOATING_IP_UUID]"
+        echo "CREATED_IP_ADDRESS [$CREATED_IP_ADDRESS]"
+        echo "CREATED_IP_UUID [$CREATED_IP_UUID]"
+        if [[ -n "$RETRIEVED_FLOATING_IP_ADDRESS" ]]; then
+          echo "floating_ip_address=$RETRIEVED_FLOATING_IP_ADDRESS" >> $GITHUB_OUTPUT
+          echo "floating_ip_uuid=$RETRIEVED_FLOATING_IP_UUID" >> $GITHUB_OUTPUT
+        elif [[ -n "$CREATED_IP_ADDRESS" ]]; then
+          echo "floating_ip_address=$CREATED_IP_ADDRESS" >> $GITHUB_OUTPUT
+          echo "floating_ip_uuid=$CREATED_IP_UUID" >> $GITHUB_OUTPUT
         else
           echo "::error ::Failed to either retrieve or create a floating IP."
           exit 1
         fi
       env:
-        RETRIEVED_FLOATING_IP:
+        RETRIEVED_FLOATING_IP_ADDRESS:
           ${{ steps.ip_retrieve_unassigned.outputs.floating_ip_address }}
-        CREATED_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
+        RETRIEVED_FLOATING_IP_UUID:
+          ${{ steps.ip_retrieve_unassigned.outputs.floating_ip_uuid }}
+        CREATED_IP_ADDRESS: ${{ steps.ip_create.outputs.floating_ip_address }}
+        CREATED_IP_UUID: ${{ steps.ip_create.outputs.floating_ip_uuid }}

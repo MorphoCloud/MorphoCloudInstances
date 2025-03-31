@@ -126,12 +126,19 @@ runs:
       run: |
         source ~/venv/bin/activate
 
-        # Get instance IP
+        # Get instance floating IP
         instance_ip=$(
           openstack server show $INSTANCE_NAME -c addresses -f json | \
           jq -r '.addresses.auto_allocated_network | if length > 1 then .[1] else "" end'
         )
         echo "instance_ip [$instance_ip]"
+
+        # Get instance internal IP (also called fixed IP)
+        instance_internal_ip=$(
+          openstack server show $INSTANCE_NAME -c addresses -f json | \
+          jq -r '.addresses.auto_allocated_network | if length > 0 then .[0] else "" end'
+        )
+        echo "instance_internal_ip [$instance_internal_ip]"
 
         # Determine if instance already has a floating IP assigned
         if [[ -n "$instance_ip" ]]; then
@@ -145,7 +152,10 @@ runs:
         # Check if an unassigned floating IP matches instance IP
         has_ip_assigned="false"
         if [[ "$has_ip" == "true" ]]; then
-          json_output=$(openstack floating ip list -f json | jq --arg ip "$instance_ip" 'map(select(.Port != null and ."Floating IP Address" == $ip))')
+          json_output=$(openstack floating ip list -f json | jq \
+            --arg fixed_ip "$instance_internal_ip" \
+            --arg ip "$instance_ip" \
+            'map(select(.Port != null and ."Fixed IP Address" == $fixed_ip and ."Floating IP Address" == $ip))')
           floating_ip_address=$(echo "$json_output" | jq -r 'if length > 0 then .[0]["Floating IP Address"] else "" end')
 
           if [[ -n "$floating_ip_address" ]]; then

@@ -164,8 +164,17 @@ runs:
         fi
 
         # If previously assigned IP is not available anymore, discard it.
-        if [[ "$has_ip_assigned" == "false" ]]; then
-          instance_ip=""
+        if [[ "$has_ip" == "true" && "$has_ip_assigned" == "false" ]]; then
+          json_output=$(openstack floating ip list -f json | jq \
+            --arg fixed_ip "$instance_internal_ip" \
+            --arg ip "$instance_ip" \
+            'map(select(.Port != null and ."Fixed IP Address" != $fixed_ip and ."Floating IP Address" == $ip))')
+          has_ip_reassigned=$(echo "$json_output" | jq -r 'if length > 0 then "true" else "false" end')
+          echo "has_ip_reassigned [$has_ip_reassigned]"
+
+          if [[ $has_ip_reassigned == "true" ]]; then
+            instance_ip=""
+          fi
         fi
 
         echo "instance_ip [$instance_ip]"

@@ -52,8 +52,9 @@ approved within 24h (often faster).
 
 ## JetStream2 Operational Status
 
-<a href="https://jetstream.status.io/" target="_blank" rel="noopener noreferrer">
-Click to see JetStream2's most recent operational status report</a>
+* <a href="https://jetstream.status.io/" target="_blank" rel="noopener noreferrer"> Click to see JetStream2's most recent operational status report</a>
+
+* <a href="https://docs.jetstream-cloud.org/overview/status/"> Number of available large resources</a>
 
 ### FUNDING ACKNOWLEDGEMENT
 

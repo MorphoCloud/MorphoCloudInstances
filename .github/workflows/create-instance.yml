@@ -204,6 +204,9 @@ jobs:
           # See "currentExoServerVersion" in exosphere/src/Types/Server.elm
           exoServerVersion=5
 
+          # Update INSTANCE_FAVOR placeholder to ensure current value is passed to ansible
+          sed -i 's/INSTANCE_FLAVOR/$INSTANCE_FLAVOR/g' ./cloud-config
+
           openstack server create "$INSTANCE_NAME" \
             --nic net-id="auto_allocated_network" \
             --security-group "exosphere" \

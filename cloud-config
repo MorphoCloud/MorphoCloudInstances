@@ -1,12 +1,41 @@
-Content-Type: multipart/mixed; boundary="===============2389165605550749110=="
-MIME-Version: 1.0
-Number-Attachments: 2
-
---===============2389165605550749110==
-Content-Type: text/x-shellscript; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="part-001"
+Content-Type: multipart/mixed; boundary="=================exosphere-user-data===="
+Number-Attachments: 4
+
+--=================exosphere-user-data====
+Content-Transfer-Encoding: 7bit
+Content-Type: text/cloud-boothook
+Content-Disposition: attachment; filename="00-exosphere-boothook.sh"
+
+#!/bin/bash
+
+# Ensure this hook only runs on the first boot.
+if cloud-init-per instance exosphere-setup-starting /bin/false; then
+  exit 0
+fi
+
+echo on > /proc/sys/kernel/printk_devkmsg || true  # Disable console rate limiting for distros that use kmsg
+sleep 1  # Ensures that console log output from any previous command completes before the following command begins
+echo '{"status":"starting", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
+chmod 640 /var/log/cloud-init-output.log
+
+
+--=================exosphere-user-data====
+Content-Transfer-Encoding: 7bit
+Content-Type: text/x-shellscript
+Content-Disposition: attachment; filename="00-exosphere-setup-running.sh"
+
+#!/bin/bash
+
+sleep 1  # Ensures that console log output from any previous command completes before the following command begins
+echo '{"status":"running", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
+
+
+--=================exosphere-user-data====
+Content-Transfer-Encoding: 7bit
+Content-Type: text/x-shellscript
+Content-Disposition: attachment; filename="90-exosphere-ansible-setup.sh"
 
 #!/bin/bash
 set +e
@@ -28,10 +57,6 @@ retry() {
   return 1
 }
 
-echo on > /proc/sys/kernel/printk_devkmsg || true  # Disable console rate limiting for distros that use kmsg
-sleep 1  # Ensures that console log output from any previous command completes before the following command begins
-echo '{"status":"running", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
-chmod 640 /var/log/cloud-init-output.log
 # {create-cluster-command}
 (which apt-get && retry apt-get install -y python3-venv) # Install python3-venv on Debian-based platforms
 (which yum     && retry yum install -y python3)      # Install python3 on RHEL-based platforms
@@ -55,23 +80,25 @@ retry git clone \
   "https://github.com/MorphoCloud/exosphere.git" \
   /opt/instance-config-mgt
 
-exosphere_sha="446f18d0d90a33ed43c3f378536493d2b65819a5" # morpho-cloud-portal-2025.04.09-dae664168
+exosphere_sha="143bf39e08aaeaed8c06577bae120ba220d3c2de" # morpho-cloud-portal-2025.04.09-dae664168
 (cd /opt/instance-config-mgt && git reset --hard $exosphere_sha)
 
 ansible-playbook \
   -i /opt/instance-config-mgt/ansible/hosts \
-  -e "{\"guac_enabled\":true,\"gui_enabled\":true,\"ansible_python_interpreter\":\"/opt/ansible-venv/bin/python\"}" \
+  -e "{\"guac_enabled\":true,\"gui_enabled\":true,\"ansible_python_interpreter\":\"/opt/ansible-venv/bin/python\",\"instance_flavor\":\"INSTANCE_FLAVOR\"}" \
   /opt/instance-config-mgt/ansible/playbook.yml
 ANSIBLE_RETURN_CODE=$?
 if [ $ANSIBLE_RETURN_CODE -eq 0 ]; then STATUS="complete"; else STATUS="error"; fi
 sleep 1  # Ensures that console log output from any previous commands complete before the following command begins
 echo '{"status":"'$STATUS'", "epoch": '$(date '+%s')'000}' | tee --append /dev/console > /dev/kmsg || true
 
---===============2389165605550749110==
-Content-Type: text/cloud-config; charset="us-ascii"
-MIME-Version: 1.0
+
+--=================exosphere-user-data====
 Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment; filename="part-002"
+Content-Type: text/cloud-config
+Content-Disposition: attachment; filename="exosphere.yml"
+
+#cloud-config
 
 users:
   - default
@@ -88,4 +115,4 @@ package_upgrade: true # {install-os-updates}
 # packages:
 #  - git{write-files}
 
---===============2389165605550749110==--
+--=================exosphere-user-data====--

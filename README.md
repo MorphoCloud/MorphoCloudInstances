@@ -32,11 +32,13 @@ approved within 24h (often faster).
   `ALT` + `SHIFT` keys. It allows copy/paste into the remote session, browse and
   download files on the remote drive and adjust screen zoom levels (cut from the
   screenshot).
-- **B:** Shortcuts to commonly used applications and to **MyData** storage volume. 
+- **B:** Shortcuts to commonly used applications and to **MyData** storage
+  volume.
 
 - **C:** Displays list of available applications (searchable)
 
-- **D:** Right mouse clicking anywhere on desktop brings this menu, including changing screen resolution (Display settings). 
+- **D:** Right mouse clicking anywhere on desktop brings this menu, including
+  changing screen resolution (Display settings).
 
 - **E:** Click on this icon anytime to extend your session for additional 4
   hours.

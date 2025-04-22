@@ -1,0 +1,94 @@
+name: Retrieve Emails
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ vars.MORPHOCLOUD_OS_CLOUD }}
+  cancel-in-progress: true
+
+jobs:
+  retrieve-emails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Retrieve emails
+        id: retrieve-emails
+        run: |
+          if [[ -z "$ENCRYPTION_KEY" ]]; then
+            echo "::error ::Failed to retrieve emails. ENCRYPTION_KEY is not set."
+            exit 1
+          fi
+
+          # Fetch & sort issue numbers into an array
+          mapfile -t issue_numbers < <(
+            gh issue list \
+              --label "request:approved" \
+              --state all \
+              --limit 1000 \
+              --json number \
+              --jq 'sort_by(.number) | .[].number'
+          )
+
+          emails=()
+
+          # Loop over each issue
+          for issue_number in "${issue_numbers[@]}"; do
+            echo "Processing issue #$issue_number"
+
+            # Extract email
+            email=$(gh issue view $issue_number --json body --jq ".body" | grep -A2 '^### Email' | tail -n1)
+
+            if [[ -z "$email" ]]; then
+              echo "::error ::Failed to extract Email for issue #$issue_number"
+              exit 1
+            fi
+
+            # Check if email is encoded
+            if [[ "$email" != *"@"* ]]; then
+              encoded="true"
+            else
+              encoded="false"
+            fi
+
+            if [[ "$encoded" == "true" ]]; then
+              email=$(echo "$email" | openssl enc -base64 -d -aes-256-cbc -salt -pass pass:$ENCRYPTION_KEY -pbkdf2) \
+              || {
+                echo "::error ::Decryption failed for issue #$issue_number"
+                exit 1
+              }
+            fi
+
+            emails+=("$email")
+          done
+
+          # Join all emails with commas and set output
+          printf -v joined "%s," "${emails[@]}"
+          joined=${joined%,}  # remove trailing comma
+          echo "emails=$joined" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENCRYPTION_KEY: ${{ secrets.STRING_ENCRYPTION_KEY }}
+
+      - name: Send mail
+        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: MorphoCloudPortal
+          to: ${{ vars.MORPHOCLOUD_GITHUB_ADMIN_EMAILS }}
+          subject:
+            "[${{ github.event.repository.name }}] List of emails for approved
+            instances"
+          convert_markdown: true
+          html_body: |
+            Below is the list of decrypted email addresses for all `request:approved` instances (up to 1000):
+
+            ```
+            ${{ steps.retrieve-emails.outputs.emails }}
+            ```
+
+            _Requested by ${{ github.actor }}. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}._

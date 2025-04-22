@@ -13,6 +13,7 @@ body:
       label: Cloud Computing Instance Flavor
       description: Select the type of cloud-computing instance to create.
       options:
+        - g3.large - GPU instance (16 CPUs, 60 GB RAM and 50% of A100 GPU)
         - g3.xl - GPU instance (32 CPUs, 125 GB RAM and A100 GPU)
         - m3.xl - General-purpose instance (32 CPUs, 125 GB RAM)
         - r3.large - Large Memory instance (64 CPUs, 500 GB RAM)

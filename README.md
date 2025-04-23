@@ -23,14 +23,14 @@ To get more information about these instances, please review
 
 |Flavor|RAM   |Cores|GPU  |
 |------|------|-----|-----|
-|g3.l  |64GB  |16   |A100 (20GB)|
-|g3.xl |128GB |32   |A100 (40GB)|
-|m3.x  |256GB |64   |None|
-|r3.l  |512GB |64   |None|
-|r3.xl |1024GB|128  |None|
+|g3.l  |60GB  |16   |A100 (20GB)|
+|g3.xl |125GB |32   |A100 (40GB)|
+|m3.x  |250GB |64   |None|
+|r3.l  |500GB |64   |None|
+|r3.xl |1000GB|128  |None|
 
 G3.l is the default flavor. <br>
-[Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/)
+[Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
 
 ## MorphoCloud Commands 
 
@@ -42,7 +42,7 @@ G3.l is the default flavor. <br>
 | `/decode_email`    | Update issue description deobfuscating emails.                                                    | Issue creator, Admin |
 | `/email`           | Send email to _Issue creator_ with connection URL (only possible if instance is active)           | Issue creator, Admin |
 | `/renew`           | Extend the instance lifespan if additional time is available.                                     | Issue creator, Admin |
-| `/create`          | Approve the request and create the instance and the volume.                                       | Admin                |
+| `/create`          | Approve the request and then e the instance and the volume.                                       | Admin                |
 | `/delete_instance` | Delete the instance.                                                                              | Admin                |
 | `/delete_volume`   | Delete the storage volume.                                                                        | Admin                |
 | `/delete_all`      | Delete the instance and volume.                                                                   | Admin                |

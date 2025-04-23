@@ -48,26 +48,28 @@ runs:
     - name: Display parsed data
       shell: bash
       run: |
-        echo ${{ toJSON(steps.parse.outputs.data) }} | jq .
+        printf '%s\n' "$DATA" | jq -r .
+      env:
+        DATA: ${{ steps.parse.outputs.data }}
 
     - name: Extract fields
       id: extract
       shell: bash
       run: |
-        instance_flavor=$(echo ${{ toJSON(steps.parse.outputs.data) }} | \
+        instance_flavor=$(printf '%s\n' "$DATA" | \
             jq -r '."cloud-computing-instance-flavor".text | split(" - ")[0]')
         echo "instance_flavor [$instance_flavor]"
         echo "instance_flavor=$instance_flavor" >> $GITHUB_OUTPUT
 
         orcid=$(
-          echo ${{ toJSON(steps.parse.outputs.data) }} |
+          printf '%s\n' "$DATA" |
           jq -r ".orcid.text"
         )
         echo "orcid=$orcid" >> $GITHUB_OUTPUT
 
         # Also strip "<" and ">" to convert from "<name@domain.org>" to "name@domain.org"
         email=$(
-          echo ${{ toJSON(steps.parse.outputs.data) }} |
+          printf '%s\n' "$DATA" |
           jq -r ".email.text" |
           sed -E 's/^<([^<>]+)>$/\1/'
         )
@@ -75,7 +77,7 @@ runs:
 
         # Also strip "<" and ">" to convert from "<name@domain.org>" to "name@domain.org"
         confirm_email=$(
-          echo ${{ toJSON(steps.parse.outputs.data) }} |
+          printf '%s\n' "$DATA" |
           jq -r '."confirm-email".text // empty' |
           sed -E 's/^<([^<>]+)>$/\1/'
         )
@@ -87,3 +89,5 @@ runs:
         fi
 
         echo "confirm_email=$confirm_email" >> $GITHUB_OUTPUT
+      env:
+        DATA: ${{ steps.parse.outputs.data }}

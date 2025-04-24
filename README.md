@@ -21,15 +21,15 @@ To get more information about these instances, please review
 
 ## Available Instance Types
 
-|Flavor|RAM   |Cores|GPU  |
-|------|------|-----|-----|
-|g3.l  |60GB  |16   |A100 (20GB)|
-|g3.xl |125GB |32   |A100 (40GB)|
-|m3.x  |250GB |64   |None|
-|r3.l  |500GB |64   |None|
-|r3.xl |1000GB|128  |None|
+|Flavor|RAM   |Cores|GPU  |**Storage**|
+|------|------|-----|-----|-----------|
+|g3.l**  |60GB  |16   |A100 (20GB)| 100GB |
+|g3.xl |125GB |32   |A100 (40GB)| 100GB |
+|m3.x  |250GB |64   |None| 100GB |
+|r3.l  |500GB |64   |None| 100GB |
+|r3.xl |1000GB|128  |None| 100GB |
 
-G3.l is the default flavor. <br>
+**g3.l is the default flavor. <br>
 [Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
 
 ## MorphoCloud Commands 

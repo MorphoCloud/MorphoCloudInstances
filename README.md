@@ -34,18 +34,18 @@ G3.l is the default flavor. <br>
 
 ## MorphoCloud Commands 
 
-| Command            | Description                                                                                       | Who can run          |
-| ------------------ | ------------------------------------------------------------------------------------------------- | -------------------- |
-| `/shelve`          | Shelve (turn off) the instance.                                                                   | Issue creator, Admin |
-| `/unshelve`        | Unshelve (turn on) the instance.                                                                  | Issue creator, Admin |
-| `/encode_email`    | Update issue description obfuscating emails.                                                      | Issue creator, Admin |
-| `/decode_email`    | Update issue description deobfuscating emails.                                                    | Issue creator, Admin |
-| `/email`           | Send email to _Issue creator_ with connection URL (only possible if instance is active)           | Issue creator, Admin |
-| `/renew`           | Extend the instance lifespan if additional time is available.                                     | Issue creator, Admin |
-| `/create`          | Approve the request and then e the instance and the volume.                                       | Admin                |
-| `/delete_instance` | Delete the instance.                                                                              | Admin                |
-| `/delete_volume`   | Delete the storage volume.                                                                        | Admin                |
-| `/delete_all`      | Delete the instance and volume.                                                                   | Admin                |
+| Command             | Description                                                                                       | Who can run          |
+| --------------------| ------------------------------------------------------------------------------------------------- | -------------------- |
+| `/shelve`           | Shelve (turn off) the instance.                                                                   | Issue creator, Admin |
+| `/unshelve`         | Unshelve (turn on) the instance.                                                                  | Issue creator, Admin |
+| `/encode_email`     | Update issue description obfuscating emails.                                                      | Issue creator, Admin |
+| `/decode_email`     | Update issue description deobfuscating emails.                                                    | Issue creator, Admin |
+| `/email`            | Send email to _Issue creator_ with connection URL (only possible if instance is active)           | Issue creator, Admin |
+| `/renew`            | Extend the instance lifespan if additional time is available.                                     | Issue creator, Admin |
+| `/create`           | Approve the request and then e the instance and the volume.                                       | Admin                |
+| `/delete_instance`  | Delete the instance.                                                                              | Admin                |
+| `/delete_volume`    | Delete the storage volume.                                                                        | Admin                |
+| `/delete_all`       | Delete the instance and volume.                                                                   | Admin                |
 
 ## Ready to give a try?
 

@@ -4,54 +4,57 @@
 
 Powerful virtual machines (compute instances) that provide interactive remote
 desktop interface with [3D Slicer](https://download.slicer.org) and
-[SlicerMorph](https://SlicerMorph.org) and its related extensions preloaded for 3D digital morphology and morphometrics data processing.
+[SlicerMorph](https://SlicerMorph.org) and its related extensions preloaded for
+3D digital morphology and morphometrics data processing.
 
 In a nutshell, you:
 
 1. Have a research and/or teaching focus centered on 3D biological structure
    (e.g., 3D morphometrics, or visualization);
-2. Need occasional access to powerful computers with large amounts of RAM and GPU (up to 40GB GPU)
+2. Need occasional access to powerful computers with large amounts of RAM and
+   GPU (up to 40GB GPU)
 3. You have a github account;
 4. You have an ORCID with a public profile.
 
-Also, note that any use case falls under the category of **Human Subject Research** is not allowed on MorphoCloud.
+Also, note that any use case falls under the category of **Human Subject
+Research** is not allowed on MorphoCloud.
 
 To get more information about these instances, please review
 [this document](https://docs.google.com/document/d/1WRds-QWnDK1MnmEhGUPyBgjE9hitiddcElAPWiAYRg4/edit#heading=h.b0yi3m7wlfk8).
 
 ## Available Instance Types
 
-|Flavor|RAM   |Cores|GPU  |**Storage**|
-|------|------|-----|-----|-----------|
-|g3.l**  |60GB  |16   |A100 (20GB)| 100GB |
-|g3.xl |125GB |32   |A100 (40GB)| 100GB |
-|m3.x  |250GB |64   |None| 100GB |
-|r3.l  |500GB |64   |None| 100GB |
-|r3.xl |1000GB|128  |None| 100GB |
+| Flavor   | RAM    | Cores | GPU         | **Storage** |
+| -------- | ------ | ----- | ----------- | ----------- |
+| g3.l\*\* | 60GB   | 16    | A100 (20GB) | 100GB       |
+| g3.xl    | 125GB  | 32    | A100 (40GB) | 100GB       |
+| m3.x     | 250GB  | 64    | None        | 100GB       |
+| r3.l     | 500GB  | 64    | None        | 100GB       |
+| r3.xl    | 1000GB | 128   | None        | 100GB       |
 
-**g3.l is the default flavor. <br>
+\*\*g3.l is the default flavor. <br>
 [Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
 
-## MorphoCloud Commands 
+## MorphoCloud Commands
 
-| Command             | Description                                                                                       | Who can run          |
-| --------------------| ------------------------------------------------------------------------------------------------- | -------------------- |
-| `/shelve`           | Shelve (turn off) the instance.                                                                   | Issue creator, Admin |
-| `/unshelve`         | Unshelve (turn on) the instance.                                                                  | Issue creator, Admin |
-| `/encode_email`     | Update issue description obfuscating emails.                                                      | Issue creator, Admin |
-| `/decode_email`     | Update issue description deobfuscating emails.                                                    | Issue creator, Admin |
-| `/email`            | Send email to _Issue creator_ with connection URL (only possible if instance is active)           | Issue creator, Admin |
-| `/renew`            | Extend the instance lifespan if additional time is available.                                     | Issue creator, Admin |
-| `/create`           | Approve the request and then e the instance and the volume.                                       | Admin                |
-| `/delete_instance`  | Delete the instance.                                                                              | Admin                |
-| `/delete_volume`    | Delete the storage volume.                                                                        | Admin                |
-| `/delete_all`       | Delete the instance and volume.                                                                   | Admin                |
+| Command            | Description                                                                             | Who can run          |
+| ------------------ | --------------------------------------------------------------------------------------- | -------------------- |
+| `/shelve`          | Shelve (turn off) the instance.                                                         | Issue creator, Admin |
+| `/unshelve`        | Unshelve (turn on) the instance.                                                        | Issue creator, Admin |
+| `/encode_email`    | Update issue description obfuscating emails.                                            | Issue creator, Admin |
+| `/decode_email`    | Update issue description deobfuscating emails.                                          | Issue creator, Admin |
+| `/email`           | Send email to _Issue creator_ with connection URL (only possible if instance is active) | Issue creator, Admin |
+| `/renew`           | Extend the instance lifespan if additional time is available.                           | Issue creator, Admin |
+| `/create`          | Approve the request and then e the instance and the volume.                             | Admin                |
+| `/delete_instance` | Delete the instance.                                                                    | Admin                |
+| `/delete_volume`   | Delete the storage volume.                                                              | Admin                |
+| `/delete_all`      | Delete the instance and volume.                                                         | Admin                |
 
 ## Ready to give a try?
 
 Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
-click **Get Started** and fill in the issue template and choose your instance flavor. Your request will be
-approved within 24h (often faster).
+click **Get Started** and fill in the issue template and choose your instance
+flavor. Your request will be approved within 24h (often faster).
 
 ## MorphoCloud Desktop Interface
 

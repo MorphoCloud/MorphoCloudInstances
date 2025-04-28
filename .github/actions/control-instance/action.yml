@@ -140,6 +140,12 @@ runs:
         )
         echo "instance_internal_ip [$instance_internal_ip]"
 
+        # Display internal IP metadata
+        echo "instance_internal_ip [$instance_internal_ip] metadata:"
+        openstack floating ip list -f json | jq \
+          --arg fixed_ip "$instance_internal_ip" \
+          'map(select(."Fixed IP Address" == $fixed_ip))'
+
         # Determine if instance already has a floating IP assigned
         if [[ -n "$instance_ip" ]]; then
           has_ip="true"
@@ -149,7 +155,7 @@ runs:
         echo "has_ip [$has_ip]"
         echo "has_ip=$has_ip" >> $GITHUB_OUTPUT
 
-        # Check if an unassigned floating IP matches instance IP
+        # Check if an assigned floating IP matches instance IP
         has_ip_assigned="false"
         if [[ "$has_ip" == "true" ]]; then
           json_output=$(openstack floating ip list -f json | jq \
@@ -163,7 +169,7 @@ runs:
           fi
         fi
 
-        # If previously assigned IP is not available anymore, discard it.
+        # If previously assigned IP (`instance_ip`) is not available anymore, discard it.
         if [[ "$has_ip" == "true" && "$has_ip_assigned" == "false" ]]; then
           json_output=$(openstack floating ip list -f json | jq \
             --arg fixed_ip "$instance_internal_ip" \

@@ -80,7 +80,7 @@ retry git clone \
   "https://github.com/MorphoCloud/exosphere.git" \
   /opt/instance-config-mgt
 
-exosphere_sha="143bf39e08aaeaed8c06577bae120ba220d3c2de" # morpho-cloud-portal-2025.04.09-dae664168
+exosphere_sha="a8fad8c5eec9ab9183ddbb8dc6cea130e7a1791c" # morpho-cloud-portal-2025.04.09-dae664168
 (cd /opt/instance-config-mgt && git reset --hard $exosphere_sha)
 
 ansible-playbook \

@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: renew command
         id: renew_command
-        uses: github/command@v2.0.0
+        uses: github/command@v2.0.1
         with:
           command: "/renew"
           reaction: "rocket"

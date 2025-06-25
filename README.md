@@ -82,7 +82,7 @@ flavor. Your request will be approved within 24h (often faster).
 - While the web browser based connection to MorphoCloud instances is the most
   convenient way, its performance may vary. Particularly if you are a using
   high-resolution monitor, application and desktop scaling might be less than
-  ideal. For better performence, we suggest using the dedicated **TurboVNC
+  ideal. For better performance, we suggest using the dedicated **TurboVNC
   client**, which is freely available at
   https://github.com/TurboVNC/turbovnc/releases. Then, choose the appropriate
   executable for your operating system. Once the TurboVNC is installed, you can

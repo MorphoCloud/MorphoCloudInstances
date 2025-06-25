@@ -79,10 +79,27 @@ flavor. Your request will be approved within 24h (often faster).
 
 ## MorphoCloud Instances performance and troubleshooting common issues
 
-* While the web browser based connection to MorphoCloud instances is the most convenient way, its performance may vary. Particularly if you are a using high-resolution monitor, application and desktop scaling might be less than ideal. For better performence, we suggest using the dedicated **TurboVNC client**, which is freely available at https://github.com/TurboVNC/turbovnc/releases. Then, choose the appropriate executable for your operating system. Once the TurboVNC is installed, you can connect to your running instance using the convention: **W.X.Y.Z:1**, where W.X.Y.Z is the IP address of the instance provided in the email. You will use the same passphrase as the connection password. You can also check the email sent by the MorphoCloudPortal for more instructions on using TurboVNC. 
+- While the web browser based connection to MorphoCloud instances is the most
+  convenient way, its performance may vary. Particularly if you are a using
+  high-resolution monitor, application and desktop scaling might be less than
+  ideal. For better performence, we suggest using the dedicated **TurboVNC
+  client**, which is freely available at
+  https://github.com/TurboVNC/turbovnc/releases. Then, choose the appropriate
+  executable for your operating system. Once the TurboVNC is installed, you can
+  connect to your running instance using the convention: **W.X.Y.Z:1**, where
+  W.X.Y.Z is the IP address of the instance provided in the email. You will use
+  the same passphrase as the connection password. You can also check the email
+  sent by the MorphoCloudPortal for more instructions on using TurboVNC.
 
-* If the 3D rendering performance appears slow, you need to make sure: (1) 3D Slicer is actually using the GPU, and (2) GPU on the instance is function. For the first issue, make sure you are always launching the Slicer from the shortcut on the desktop. For the latter, open a terminal window and type the command `nvidia-smi`. This should list the GPU in your system, its driver and CUDA version, along with the applications using it (e.g., if Slicer is running, it should be listed). If there is any error, please copy and paste the full screenshot and notify us. Sometimes rebooting the system from the command line via the command `sudo reboot`, helps clear the issue.
-
+- If the 3D rendering performance appears slow, you need to make sure: (1) 3D
+  Slicer is actually using the GPU, and (2) GPU on the instance is function. For
+  the first issue, make sure you are always launching the Slicer from the
+  shortcut on the desktop. For the latter, open a terminal window and type the
+  command `nvidia-smi`. This should list the GPU in your system, its driver and
+  CUDA version, along with the applications using it (e.g., if Slicer is
+  running, it should be listed). If there is any error, please copy and paste
+  the full screenshot and notify us. Sometimes rebooting the system from the
+  command line via the command `sudo reboot`, helps clear the issue.
 
 ## Funding & Acknowledgement
 

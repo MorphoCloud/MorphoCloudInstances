@@ -1,0 +1,45 @@
+name: Approve Instance Management
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    if:
+      ${{ !github.event.issue.pull_request && (
+      contains(github.event.comment.body, '/approve') ) }}
+    steps:
+      - name: approve command
+        id: approve_command
+        uses: github/command@v2.0.1
+        with:
+          command: "/approve"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+
+      - name: Add "request:approved" label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const approver = context.payload.comment.user.login;
+            core.info(`Approving request by: ${approver}`);
+
+            await github.rest.issues.addLabels({
+              issue_number: context.payload.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ["request:approved"]
+            })
+
+      - name: Comment (approval confirmation)
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ✅ Instance management approved by **${{ github.event.comment.user.login }}**.
+
+            @${{ github.event.issue.user.login }} may now use commands such as `/create`, `/shelve`, or `/unshelve`.

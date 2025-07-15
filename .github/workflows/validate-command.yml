@@ -38,6 +38,7 @@ jobs:
             "/delete_instance"
             "/delete_volume"
             "/delete_all"
+            "/approve"
           )
 
           if printf '%s\n' "${SUPPORTED_COMMANDS[@]}" | grep -Fxq "$TRIMMED_COMMAND"; then

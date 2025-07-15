@@ -18,21 +18,64 @@ jobs:
           command: "/create"
           reaction: "rocket"
           allowed_contexts: "issue"
-          permissions: "write,maintain,admin"
-          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - uses: actions/checkout@v4
 
-      - name: Add "request:approved" label
+      - name:
+          Convenienty add "request:approved" label if comment added by an admin
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.addLabels({
-              issue_number: context.payload.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: ["request:approved"]
-            })
+            const admins = process.env.MORPHOCLOUD_GITHUB_ADMINS.split(',').map(s => s.trim());
+            const actor = context.payload.comment.user.login;
+            if (admins.includes(actor)) {
+              await github.rest.issues.addLabels({
+                issue_number: context.payload.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["request:approved"]
+              });
+            } else {
+              core.info(`${actor} is not in the list of admins`);
+            }
+        env:
+          MORPHOCLOUD_GITHUB_ADMINS: ${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Check instance management approval
+        id: check_approval
+        uses: ./.github/actions/check-approval
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: command results comment (Instance management not approved)
+        if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `/create` command failed because management of **${{ steps.define.outputs.instance_name }}** has not been approved yet.
+
+      - name: instance management not approved (failure)
+        if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+        run: |
+          echo "::error ::Instance $INSTANCE_NAME management not approved"
+          exit 1
+        env:
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
       - name: comment (progress)
         id: couc_progress
@@ -60,13 +103,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-
-      - name: Define instance name
-        id: define
-        uses: ./.github/actions/define-instance-name
-        with:
-          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
-          issue_number: ${{ github.event.issue.number }}
 
       - name: Check instance exists
         id: check_instance

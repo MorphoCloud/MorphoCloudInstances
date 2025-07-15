@@ -104,9 +104,11 @@ runs:
             Alternatively, you can extend the session at any time before the timeout by clicking the **"ExtendInstanceSession" icon on the desktop**.
             If no action is taken, the instance will be shelved and all GUI or SSH connections will be disconnected. Your data will be preserved and the instance can
             later be unshelved.
-          - To unshelve an existing instance, use the`/unshelve` command.
+          - To create an instance, use the `/create` command.
+          - To unshelve an existing instance, use the `/unshelve` command.
           - To shelve an instance and preserve your allocation, use the `/shelve` command.
           - To obtain the latest set of access credentials, use the `/email` command.
+          - To delete an instance and/or its volume, use the `/delete_instance`, `/delete_volume`, or `/delete_all` commands.
           - Commands should be added as comments to issue [${{ github.repository }}#${{ inputs.instance_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.instance_issue_number }})
 
           If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
@@ -127,12 +129,16 @@ runs:
           _The commands listed below may be added as comments to issue [${{ github.repository }}#${{ inputs.instance_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.instance_issue_number }}). Only one command
           may be entered per comment._
 
+          - `/create`: Create **${{ inputs.instance_name }}**
           - `/shelve`: Shelve **${{ inputs.instance_name }}**
           - `/unshelve`: Unshelve **${{ inputs.instance_name }}**
           - `/encode_email`: Update issue description obfuscating emails
           - `/decode_email`: Update issue description deobfuscating emails
           - `/email`: Send this email with connection URL
           - `/renew`: Extend the instance lifespan if additional time is available.
+          - `/delete_instance`: Delete **${{ inputs.instance_name }}**
+          - `/delete_volume`: Delete volume associated with **${{ inputs.instance_name }}**
+          - `/delete_all`: Delete both **${{ inputs.instance_name }}** and associated volume
 
     - name: Set error message
       id: set_error_message

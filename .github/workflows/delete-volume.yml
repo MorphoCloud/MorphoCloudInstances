@@ -18,8 +18,10 @@ jobs:
           command: "/delete_volume"
           reaction: "rocket"
           allowed_contexts: "issue"
-          permissions: "write,maintain,admin"
-          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist:
+            "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
+            github.event.issue.user.login }}"
 
       - uses: actions/checkout@v4
 

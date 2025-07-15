@@ -21,6 +21,39 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Define instance name
+      id: define
+      uses: ./.github/actions/define-instance-name
+      with:
+        prefix: ${{ inputs.instance_name_prefix }}
+        issue_number: ${{ inputs.issue_number }}
+
+    - name: Check instance management approval
+      id: check_approval
+      uses: ./.github/actions/check-approval
+      with:
+        token: ${{ inputs.token }}
+        issue_number: ${{ github.event.issue.number }}
+
+    - name: command results comment (Instance management not approved)
+      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `/delete_volume` command failed because management of **${{ steps.define.outputs.instance_name }}** has not been approved yet.
+
+    - name: instance management not approved (failure)
+      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+      shell: bash
+      run: |
+        echo "::error ::Instance $INSTANCE_NAME management not approved"
+        exit 1
+      env:
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
     - name: Define volume name
       id: define_volume_name
       uses: ./.github/actions/define-volume-name
@@ -44,13 +77,6 @@ runs:
           ### Command Results ❌
 
           `/delete_volume` command failed because **${{ steps.define_volume_name.outputs.volume_name }}** volume does not exist.
-
-    - name: Define instance name
-      id: define
-      uses: ./.github/actions/define-instance-name
-      with:
-        prefix: ${{ inputs.instance_name_prefix }}
-        issue_number: ${{ inputs.issue_number }}
 
     - name: Check instance exists
       id: check_instance

@@ -1,0 +1,31 @@
+name: "Check instance management approval"
+description: "Check instance management approval"
+inputs:
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  issue_number:
+    description: "Issue number"
+    required: true
+outputs:
+  is_approved:
+    description: "Set to 'true' or 'false'"
+    value: ${{ steps.check_approval.outputs.is_approved }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check approval
+      id: check_approval
+      shell: bash
+      run: |
+        if gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name' | grep -q "^request:approved$"; then
+          is_approved="true"
+        else
+          is_approved="false"
+        fi
+
+        echo "is_approved [$is_approved]"
+        echo "is_approved=$is_approved" >> $GITHUB_OUTPUT
+      env:
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        GITHUB_TOKEN: ${{ inputs.token }}

@@ -51,13 +51,13 @@ jobs:
         run: |
           if [[ "$ORCID" =~ ^([0-9]{4}-){3}[0-9]{3}([0-9]|X)$ ]]; then
             valid="true"
-            emojii="✅"
+            emoji="✅"
           else
             valid="false"
-            emojii="❌"
+            emoji="❌"
           fi
           echo "valid=$valid" >> $GITHUB_OUTPUT
-          echo "emojii=$emojii" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
         env:
           ORCID: ${{ steps.extract.outputs.orcid }}
 
@@ -89,13 +89,13 @@ jobs:
           email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
           if [[ "$EMAIL" =~ $email_regex ]]; then
             valid="true"
-            emojii="✅"
+            emoji="✅"
           else
             valid="false"
-            emojii="❌"
+            emoji="❌"
           fi
           echo "valid=$valid" >> $GITHUB_OUTPUT
-          echo "emojii=$emojii" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
         env:
           EMAIL: ${{ steps.decode_email.outputs.output_string }}
 
@@ -129,13 +129,13 @@ jobs:
           email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
           if [[ "$CONFIRM_EMAIL" =~ $email_regex ]]; then
             valid="true"
-            emojii="✅"
+            emoji="✅"
           else
             valid="false"
-            emojii="❌"
+            emoji="❌"
           fi
           echo "valid=$valid" >> $GITHUB_OUTPUT
-          echo "emojii=$emojii" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
         env:
           CONFIRM_EMAIL: ${{ steps.decode_confirm_email.outputs.output_string }}
 
@@ -144,13 +144,13 @@ jobs:
         run: |
           if [[ "$EMAIL" == "$CONFIRM_EMAIL" ]]; then
             valid="true"
-            emojii="✅"
+            emoji="✅"
           else
             valid="false"
-            emojii="❌"
+            emoji="❌"
           fi
           echo "valid=$valid" >> $GITHUB_OUTPUT
-          echo "emojii=$emojii" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
         env:
           EMAIL: ${{ steps.decode_email.outputs.output_string }}
           CONFIRM_EMAIL: ${{ steps.decode_confirm_email.outputs.output_string }}
@@ -205,7 +205,7 @@ jobs:
 
             | Check                   | ORCID iD format                                | Email format                                   | Confirm Email format                                   | Emails match                                   |
             | ----------------------- |:----------------------------------------------:|:----------------------------------------------:|:------------------------------------------------------:|:----------------------------------------------:|
-            | Status                  | ${{ steps.check_orcid_format.outputs.emojii }} | ${{ steps.check_email_format.outputs.emojii }} | ${{ steps.check_confirm_email_format.outputs.emojii }} | ${{ steps.check_emails_match.outputs.emojii }} |
+            | Status                  | ${{ steps.check_orcid_format.outputs.emoji }}  | ${{ steps.check_email_format.outputs.emoji }}  | ${{ steps.check_confirm_email_format.outputs.emoji }}  | ${{ steps.check_emails_match.outputs.emoji }}  |
 
       - name: command results comment (status)
         if:
@@ -223,7 +223,7 @@ jobs:
 
             | Check                   | ORCID iD format                                | Email format                                   | Confirm Email format                                   | Emails match                                   |
             | ----------------------- |:----------------------------------------------:|:----------------------------------------------:|:------------------------------------------------------:|:----------------------------------------------:|
-            | Status                  | ${{ steps.check_orcid_format.outputs.emojii }} | ${{ steps.check_email_format.outputs.emojii }} | ${{ steps.check_confirm_email_format.outputs.emojii }} | ${{ steps.check_emails_match.outputs.emojii }} |
+            | Status                  | ${{ steps.check_orcid_format.outputs.emoji }}  | ${{ steps.check_email_format.outputs.emoji }}  | ${{ steps.check_confirm_email_format.outputs.emoji }}  | ${{ steps.check_emails_match.outputs.emoji }}  |
 
             > [!IMPORTANT]
             > If the ORCID iD format is incorrect, edit the issue description to correct it.

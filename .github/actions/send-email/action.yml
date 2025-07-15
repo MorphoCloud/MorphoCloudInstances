@@ -91,7 +91,7 @@ runs:
         html_body: |
           Your MorphoCloud instance is up and running:
 
-          * **Graphical User Interface (GUI)**: Use the weblink provided below to access your instance.
+          * **Graphical User Interface (GUI)**: Use the URL provided to connect from a web browser. For improved performance and responsiveness, you may also use a dedicated TurboVNC client.
           * **Command Line Access**: Use the SSH information provided below to access your instance
           from the command line.
 
@@ -99,7 +99,11 @@ runs:
 
           **Important Notes:**
 
-          - Each session is limited to 4h, after which your instance is automatically shelved.
+          - Each session is limited to 4 hours. **Without explicit action, your instance will be automatically shelved after this time.** Around 3h30m into your session,
+            a popup will appear in the graphical interface asking whether you'd like to extend your session — clicking "Yes" will delay shelving by another 4 hours.
+            Alternatively, you can extend the session at any time before the timeout by clicking the **"ExtendInstanceSession" icon on the desktop**.
+            If no action is taken, the instance will be shelved and all GUI or SSH connections will be disconnected. Your data will be preserved and the instance can
+            later be unshelved.
           - To unshelve an existing instance, use the`/unshelve` command.
           - To shelve an instance and preserve your allocation, use the `/shelve` command.
           - To obtain the latest set of access credentials, use the `/email` command.
@@ -109,6 +113,7 @@ runs:
 
           **Connection Methods:**
 
+          - TurboVNC: `${{ steps.instance_metadata.outputs.instance_ip }}:1`
           - Web connect: ${{ steps.guacamole.outputs.connection_url }}
           - SSH: `ssh exouser@${{ steps.instance_metadata.outputs.instance_ip }}`
 

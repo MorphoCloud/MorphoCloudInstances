@@ -18,11 +18,20 @@ runs:
       id: check_approval
       shell: bash
       run: |
-        if gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[].name' | grep -q "^request:approved$"; then
-          is_approved="true"
-        else
-          is_approved="false"
+        echo "Fetching labels for issue #$ISSUE_NUMBER"
+
+        LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels 2>/dev/null)
+        if [ $? -ne 0 ] || [ -z "$LABELS_JSON" ]; then
+          echo "Failed to fetch labels or issue does not exist."
+          echo "is_approved=false" >> $GITHUB_OUTPUT
+          exit 0
         fi
+
+        echo "LABELS_JSON:"
+        echo "$LABELS_JSON" | jq .
+
+        # Use jq to check if the label exists
+        is_approved=$(echo "$LABELS_JSON" | jq -e '[.labels[].name] | index("request:approved")' > /dev/null && echo "true" || echo "false")
 
         echo "is_approved [$is_approved]"
         echo "is_approved=$is_approved" >> $GITHUB_OUTPUT

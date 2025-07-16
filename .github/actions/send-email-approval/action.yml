@@ -1,0 +1,95 @@
+name: "Send approval email"
+description: "Send approval email"
+inputs:
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
+  mail_server_username:
+    description: "mail server username"
+    required: true
+  mail_server_password:
+    description: "mail server password"
+    required: true
+  instance_name:
+    description: "Name of the instance to connect to"
+    required: true
+  instance_issue_number:
+    description: "Reference of the GitHub issue associated with the instance"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Extract fields
+      id: extract
+      uses: ./.github/actions/extract-issue-fields
+      with:
+        token: ${{ inputs.token }}
+        repository: ${{ github.repository }}
+        issue_number: ${{ inputs.instance_issue_number }}
+
+    - name: Check if email is encoded
+      id: check_email_encryption
+      shell: bash
+      run: |
+        if [[ "$EMAIL" != *"@"* ]]; then
+          encoded="true"
+        else
+          encoded="false"
+        fi
+        echo "encoded=$encoded" >> $GITHUB_OUTPUT
+      env:
+        EMAIL: ${{ steps.extract.outputs.email }}
+
+    - name: Decode email
+      id: decode_email
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "decode"
+        skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+    - name: Send approval mail
+      uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+      with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        secure: true
+        username: ${{ inputs.mail_server_username }}
+        password: ${{ inputs.mail_server_password }}
+        from: MorphoCloudPortal
+        to: ${{ steps.decode_email.outputs.output_string }}
+        subject:
+          "[${{ github.event.repository.name }}] Approval granted for instance:
+          ${{ inputs.instance_name }}"
+        convert_markdown: true
+        html_body: |
+          ✅ Your request for a MorphoCloud instance has been approved.
+
+          **What’s next?**
+
+          - To create a new instance, comment `/create` on the issue.
+          - If you previously shelved an instance, comment `/unshelve` to restore it.
+          - To resend connection details later, use `/email`.
+
+          _Only one command should be used per comment._
+
+          If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
+
+          **Supported Issue Commands:**
+
+          _The following commands can be added as comments to issue [${{ github.repository }}#${{ inputs.instance_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.instance_issue_number }}):_
+
+          - `/create`: Create *${{ inputs.instance_name }}*
+          - `/shelve`: Shelve *${{ inputs.instance_name }}*
+          - `/unshelve`: Unshelve *${{ inputs.instance_name }}*
+          - `/encode_email`: Obfuscate the email in the issue
+          - `/decode_email`: Reveal the email in the issue
+          - `/email`: Resend connection instructions
+          - `/renew`: Extend the instance session (if available)
+          - `/delete_instance`: Delete *${{ inputs.instance_name }}*
+          - `/delete_volume`: Delete the associated volume
+          - `/delete_all`: Delete both *${{ inputs.instance_name }}* and its volume

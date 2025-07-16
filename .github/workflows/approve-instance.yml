@@ -35,6 +35,26 @@ jobs:
               labels: ["request:approved"]
             })
 
+      - uses: actions/checkout@v4
+
+      - name: Define instance name
+        id: define
+        uses: ./.github/actions/define-instance-name
+        with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Send approval mail
+        id: send_email
+        uses: ./.github/actions/send-email-approval
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+          instance_issue_number: ${{ github.event.issue.number }}
+
       - name: Comment (approval confirmation)
         uses: peter-evans/create-or-update-comment@v4
         with:
@@ -43,3 +63,15 @@ jobs:
             ✅ Instance management approved by **${{ github.event.comment.user.login }}**.
 
             @${{ github.event.issue.user.login }} may now use commands such as `/create`, `/shelve`, or `/unshelve`.
+
+      - name: command results comment (failure)
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `/approve` command failed to be applied to this issue.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

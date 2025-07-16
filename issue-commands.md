@@ -16,6 +16,7 @@ may be entered per comment._
 | `/delete_volume`   | Delete the volume.                                            | Issue creator, Admin |
 | `/delete_all`      | Delete the instance and volume.                               | Issue creator, Admin |
 | `/approve`         | Grant issue creator right to manage instance and volume.      | Admin                |
+| `/unapprove`       | Remove issue creator right to manage instance and volume.     | Admin                |
 
 _Once approved, the issue creator can run `/create`, `/delete_instance`,
 `/delete_volume`, and `/delete_all`._

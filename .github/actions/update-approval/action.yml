@@ -1,0 +1,98 @@
+name: "Update Approval"
+description: "Update Approval"
+inputs:
+  issue_number:
+    description: "Issue number"
+    required: true
+  command_name:
+    description: "Name of the command to execute: approve, unapprove"
+    required: true
+  instance_name_prefix:
+    description: "Instance name prefix"
+    required: true
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
+  mail_server_username:
+    description: "mail server username"
+    required: true
+  mail_server_password:
+    description: "mail server password"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Validate command
+      shell: bash
+      run: |
+        if [[ ! $COMMAND_NAME =~ ^approve|unapprove$ ]]; then
+          echo "::error ::Unknown command name '$COMMAND_NAME'. Valid commands are 'approve' or 'unapprove'."
+          exit 1
+        fi
+      env:
+        COMMAND_NAME: ${{ inputs.command_name }}
+
+    - name: Remove "request:approved" label
+      if: ${{ inputs.command_name == 'unapprove' }}
+      shell: bash
+      run: |
+        gh issue edit $ISSUE_NUMBER --remove-label "request:approved"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+
+    - name: Add "request:approved" label
+      if: ${{ inputs.command_name == 'approve' }}
+      shell: bash
+      run: |
+        gh issue edit $ISSUE_NUMBER --add-label "request:approved"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+
+    - name: Define instance name
+      if: ${{ inputs.command_name == 'approve' }}
+      id: define
+      uses: ./.github/actions/define-instance-name
+      with:
+        prefix: ${{ inputs.instance_name_prefix }}
+        issue_number: ${{ inputs.issue_number }}
+
+    - name: Send approval mail
+      if: ${{ inputs.command_name == 'approve' }}
+      id: send_email
+      uses: ./.github/actions/send-email-approval
+      with:
+        token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
+        instance_name: ${{ steps.define.outputs.instance_name }}
+        instance_issue_number: ${{ github.event.issue.number }}
+
+    - name: Comment (approval confirmation)
+      if: ${{ inputs.command_name == 'approve' }}
+      uses: peter-evans/create-or-update-comment@v4
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ✅ Instance management approved by **${{ github.event.comment.user.login }}**.
+
+          @${{ github.event.issue.user.login }} may now use commands such as `/create`, `/shelve`, or `/unshelve`.
+
+    - name: command results comment (failure)
+      if: ${{ failure() }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `/${{ inputs.command_name }}` command failed to be applied to this issue.
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -9,7 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     if:
       ${{ !github.event.issue.pull_request && (
-      contains(github.event.comment.body, '/approve') ) }}
+      contains(github.event.comment.body, '/approve') ||
+      contains(github.event.comment.body, '/unapprove')) }}
     steps:
       - name: approve command
         id: approve_command
@@ -21,57 +22,55 @@ jobs:
           permissions: "write,maintain,admin"
           allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
 
-      - name: Add "request:approved" label
-        uses: actions/github-script@v7
+      - name: unapprove command
+        id: unapprove_command
+        uses: github/command@v2.0.1
         with:
-          script: |
-            const approver = context.payload.comment.user.login;
-            core.info(`Approving request by: ${approver}`);
+          command: "/unapprove"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
 
-            await github.rest.issues.addLabels({
-              issue_number: context.payload.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              labels: ["request:approved"]
-            })
+      - name: Set command metadata
+        id: command
+        if:
+          ${{ steps.approve_command.outputs.continue == 'true' ||
+          steps.unapprove_command.outputs.continue == 'true' }}
+        run: |
+          if [[ "$APPROVE_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$APPROVE_COMMAND_CONTINUE"
+            command_name="approve"
+            comment_id="${{ steps.approve_command.outputs.comment_id }}"
+          elif [[ "$UNAPPROVE_COMMAND_CONTINUE" == "true" ]]; then
+            continue="$UNAPPROVE_COMMAND_CONTINUE"
+            command_name="unapprove"
+            comment_id="${{ steps.unapprove_command.outputs.comment_id }}"
+          else
+            continue="false"
+            command_name=""
+            comment_id=""
+          fi
+          echo "continue=$continue" >> $GITHUB_OUTPUT
+          echo "command_name=$command_name" >> $GITHUB_OUTPUT
+          echo "comment_id=$comment_id" >> $GITHUB_OUTPUT
+        env:
+          APPROVE_COMMAND_CONTINUE:
+            ${{ steps.approve_command.outputs.continue }}
+          UNAPPROVE_COMMAND_CONTINUE:
+            ${{ steps.unapprove_command.outputs.continue }}
 
       - uses: actions/checkout@v4
 
-      - name: Define instance name
-        id: define
-        uses: ./.github/actions/define-instance-name
+      - name: Update approval
+        id: update_approval
+        if: ${{ steps.command.outputs.continue == 'true' }}
+        uses: ./.github/actions/update-approval
         with:
-          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           issue_number: ${{ github.event.issue.number }}
-
-      - name: Send approval mail
-        id: send_email
-        uses: ./.github/actions/send-email-approval
-        with:
+          command_name: ${{ steps.command.outputs.command_name }}
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
           string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}
-          instance_name: ${{ steps.define.outputs.instance_name }}
-          instance_issue_number: ${{ github.event.issue.number }}
-
-      - name: Comment (approval confirmation)
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ✅ Instance management approved by **${{ github.event.comment.user.login }}**.
-
-            @${{ github.event.issue.user.login }} may now use commands such as `/create`, `/shelve`, or `/unshelve`.
-
-      - name: command results comment (failure)
-        if: ${{ failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ### Command Results ❌
-
-            `/approve` command failed to be applied to this issue.
-
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

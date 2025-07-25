@@ -35,26 +35,27 @@ To get more information about these instances, please review
 \*\*g3.l is the default flavor. <br>
 [Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
 
-## MorphoCloud Commands
-
-| Command            | Description                                                                             | Who can run          |
-| ------------------ | --------------------------------------------------------------------------------------- | -------------------- |
-| `/shelve`          | Shelve (turn off) the instance.                                                         | Issue creator, Admin |
-| `/unshelve`        | Unshelve (turn on) the instance.                                                        | Issue creator, Admin |
-| `/encode_email`    | Update issue description obfuscating emails.                                            | Issue creator, Admin |
-| `/decode_email`    | Update issue description deobfuscating emails.                                          | Issue creator, Admin |
-| `/email`           | Send email to _Issue creator_ with connection URL (only possible if instance is active) | Issue creator, Admin |
-| `/renew`           | Extend the instance lifespan if additional time is available.                           | Issue creator, Admin |
-| `/create`          | Approve the request and then e the instance and the volume.                             | Admin                |
-| `/delete_instance` | Delete the instance.                                                                    | Admin                |
-| `/delete_volume`   | Delete the storage volume.                                                              | Admin                |
-| `/delete_all`      | Delete the instance and volume.                                                         | Admin                |
-
 ## Ready to give a try?
 
 Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
 click **Get Started** and fill in the issue template and choose your instance
 flavor. Your request will be approved within 24h (often faster).
+
+## MorphoCloud Commands
+
+Once your request is approved you can use these commands to manage your instance. 
+
+| Command             | Description                                                                             | Who can run          |
+| ------------------  | --------------------------------------------------------------------------------------- | -------------------- |
+| `/create`           | Create the instance (and the volume if not present already).                            | Issue creator, Admin |
+| `/shelve`           | Shelve (turn off) a running instance.                                                   | Issue creator, Admin |
+| `/unshelve`         | Unshelve (turn on) a stopped instance.                                                  | Issue creator, Admin |
+| `/delete_instance`  | Delete the instance (e.g. when it is unresponsive, then you can use the `/create` to recreate afresh.    |Issue creator, Admin |
+| `/delete_volume`    | Delete the storage volume. (beware you will loose all the existing data)                | Issue creator, Admin | 
+| `/encode_email`     | Update issue description obfuscating emails.                                            | Issue creator, Admin |
+| `/decode_email`     | Update issue description deobfuscating emails.                                          | Issue creator, Admin |
+| `/email`            | Resend email to _Issue creator_ with connection URL (only possible if instance is active) | Issue creator, Admin |
+| `/renew`            | Extend the instance lifespan if additional time is available.                           | Issue creator, Admin |
 
 ## MorphoCloud Desktop Interface
 

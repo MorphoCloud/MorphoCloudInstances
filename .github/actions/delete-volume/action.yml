@@ -85,10 +85,46 @@ runs:
         os_cloud: ${{ inputs.os_cloud }}
         instance_name: ${{ steps.define.outputs.instance_name }}
 
-    - name: Detach Volume
+    - name: Check volume is attached
       if:
         ${{ steps.check_volume.outputs.exists == 'true' &&
         steps.check_instance.outputs.exists == 'true' }}
+      id: check_volume_attached
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        volume_id=$(openstack volume list -f json | \
+          jq \
+          --arg volume_name "$VOLUME_NAME" \
+          -c '.[] | select(.Name == $volume_name)' | \
+          jq -r '.ID' | tail -1)
+        echo "volume_id [$volume_id]"
+
+        instance_id=$(openstack server list -f json | \
+          jq \
+          --arg instance_name "$INSTANCE_NAME" \
+          -c '.[] | select(.Name == $instance_name)' | \
+          jq -r '.ID' | tail -1)
+        echo "instance_id [$instance_id]"
+
+        is_attached=$(openstack server show "$instance_id" -f json | \
+          jq \
+          --arg volume_id "$volume_id" \
+          '[.volumes_attached[]?.id] | index($volume_id) != null')
+
+        echo "is_attached [$is_attached]"
+        echo "is_attached=$is_attached" >> $GITHUB_OUTPUT
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+        VOLUME_NAME: ${{ steps.define_volume_name.outputs.volume_name }}
+
+    - name: Detach Volume
+      if:
+        ${{ steps.check_volume.outputs.exists == 'true' &&
+        steps.check_instance.outputs.exists == 'true' &&
+        steps.check_volume_attached.outputs.is_attached == 'true' }}
       id: detach_volume
       shell: bash
       run: |

@@ -47,15 +47,15 @@ Once your request is approved you can use these commands to manage your instance
 
 | Command             | Description                                                                             | Who can run          |
 | ------------------  | --------------------------------------------------------------------------------------- | -------------------- |
-| `/create`           | Create the instance (and the volume if not present already).                            | Issue creator, Admin |
+| `/create`           | Create the instance (and the storage volume if not present already).                    | Issue creator, Admin |
 | `/shelve`           | Shelve (turn off) a running instance.                                                   | Issue creator, Admin |
 | `/unshelve`         | Unshelve (turn on) a stopped instance.                                                  | Issue creator, Admin |
-| `/delete_instance`  | Delete the instance (e.g. when it is unresponsive, then you can use the `/create` to recreate afresh.    |Issue creator, Admin |
-| `/delete_volume`    | Delete the storage volume. (beware you will loose all the existing data)                | Issue creator, Admin | 
+| `/delete_instance`  | Delete the instance (e.g. when it is unresponsive, then you can use the `/create` to recreate the instance afresh.    |Issue creator, Admin |
+| `/delete_volume`    | Delete the storage volume. (Beware you will loose all the existing data)                | Issue creator, Admin | 
 | `/encode_email`     | Update issue description obfuscating emails.                                            | Issue creator, Admin |
 | `/decode_email`     | Update issue description deobfuscating emails.                                          | Issue creator, Admin |
 | `/email`            | Resend email to _Issue creator_ with connection URL (only possible if instance is active) | Issue creator, Admin |
-| `/renew`            | Extend the instance lifespan if additional time is available.                           | Issue creator, Admin |
+| `/renew`            | Extend the instance lifespan one-time.                                                  | Issue creator, Admin |
 
 ## MorphoCloud Desktop Interface
 

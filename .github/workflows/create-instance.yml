@@ -238,7 +238,7 @@ jobs:
           exoClientUuid=b7b75870-ecb5-4aca-ae73-49474a7f531e
 
           # See "currentExoServerVersion" in exosphere/src/Types/Server.elm
-          exoServerVersion=5
+          exoServerVersion=6
 
           # Update INSTANCE_FAVOR placeholder to ensure current value is passed to ansible
           sed -i 's/INSTANCE_FLAVOR/$INSTANCE_FLAVOR/g' ./cloud-config

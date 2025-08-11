@@ -41,6 +41,8 @@ Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
 click **Get Started** and fill in the issue template and choose your instance
 flavor. Your request will be approved within 24h (often faster).
 
+Currently installed 3D Slicer on the MorphoCloud revision is **33836** (from August 9, 2025). 
+
 ## MorphoCloud Commands
 
 Once your request is approved you can use these commands to manage your

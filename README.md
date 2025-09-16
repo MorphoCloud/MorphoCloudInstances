@@ -81,22 +81,27 @@ instance.
   <img src="https://github.com/MorphoCloud/MorphoCloudInstances/blob/main/MCI_Desktop.png" />
 </p>
 
-## MorphoCloud Instances performance and troubleshooting common issues
+## MorphoCloud Instances FAQ for common issues
 
-- While the web browser based connection to MorphoCloud instances is the most
-  convenient way, its performance may vary. Particularly if you are a using
-  high-resolution monitor, application and desktop scaling might be less than
-  ideal. For better performance, we suggest using the dedicated **TurboVNC
+- After I login to the instance, **only a black background and the mouse pointer is visible**. This is due to a known race condition. Connect to your instance from the command line using the SSH instructions and type these two commands to fix it:
+```
+sudo systemctl disable gdm
+sudo reboot now
+```
+then wait a couple minutes for your instance to reboot and become online, and then retry connecting from GUI.
+
+- **Cursor is laggy, and there is high latency in UI (not just Slicer, all windows are slow to refresh):** This is due to limited bandwidth of your network connection. If you can try, switching to a different network. Also for better performance, we suggest using the dedicated **TurboVNC
   client**, which is freely available at
-  https://github.com/TurboVNC/turbovnc/releases. Then, choose the appropriate
-  executable for your operating system. Once the TurboVNC is installed, you can
+  https://github.com/TurboVNC/turbovnc/releases. TurboVNC allows you to reduce the quality of the desktop image so that less bandwidth is used when refreshing the screens. Once the TurboVNC is installed, you can
   connect to your running instance using the convention: **W.X.Y.Z:1**, where
   W.X.Y.Z is the IP address of the instance provided in the email. You will use
   the same passphrase as the connection password. You can also check the email
   sent by the MorphoCloudPortal for more instructions on using TurboVNC.
 
-- If the 3D rendering performance appears slow, you need to make sure: (1) 3D
-  Slicer is actually using the GPU, and (2) GPU on the instance is function. For
+- **Instance GUI doesn't scale correctly (i.e., fonts too small/large):** Try using **TurboVNC** client for connecting to the instance. TurboVNC handles the high-resolution DPI scaling and resizing the application window much better than the web browser connections.   
+
+- **3D rendering performance of Slicer appears slow:**, You need to make sure: (1) 3D
+  Slicer is actually using the GPU, and (2) GPU on the instance is functional. For
   the first issue, make sure you are always launching the Slicer from the
   shortcut on the desktop. For the latter, open a terminal window and type the
   command `nvidia-smi`. This should list the GPU in your system, its driver and

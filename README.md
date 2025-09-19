@@ -41,7 +41,8 @@ Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
 click **Get Started** and fill in the issue template and choose your instance
 flavor. Your request will be approved within 24h (often faster).
 
-Currently installed 3D Slicer on the MorphoCloud revision is **33836** (from August 9, 2025). 
+Currently installed 3D Slicer on the MorphoCloud revision is **33836** (from
+August 9, 2025).
 
 ## MorphoCloud Commands
 
@@ -83,30 +84,43 @@ instance.
 
 ## MorphoCloud Instances FAQ for common issues
 
-- After I login to the instance, **only a black background and the mouse pointer is visible**. This is due to a known race condition. Connect to your instance from the command line using the SSH instructions and type these two commands to fix it:
+- After I login to the instance, **only a black background and the mouse pointer
+  is visible**. This is due to a known race condition. Connect to your instance
+  from the command line using the SSH instructions and type these two commands
+  to fix it:
+
 ```
 sudo systemctl disable gdm
 sudo reboot now
 ```
-then wait a couple minutes for your instance to reboot and become online, and then retry connecting from GUI.
 
-- **Cursor is laggy, and there is high latency in UI (not just Slicer, all windows are slow to refresh):** This is due to limited bandwidth of your network connection. If you can try, switching to a different network. Also for better performance, we suggest using the dedicated **TurboVNC
-  client**, which is freely available at
-  https://github.com/TurboVNC/turbovnc/releases. TurboVNC allows you to reduce the quality of the desktop image so that less bandwidth is used when refreshing the screens. Once the TurboVNC is installed, you can
+then wait a couple minutes for your instance to reboot and become online, and
+then retry connecting from GUI.
+
+- **Cursor is laggy, and there is high latency in UI (not just Slicer, all
+  windows are slow to refresh):** This is due to limited bandwidth of your
+  network connection. If you can try, switching to a different network. Also for
+  better performance, we suggest using the dedicated **TurboVNC client**, which
+  is freely available at https://github.com/TurboVNC/turbovnc/releases. TurboVNC
+  allows you to reduce the quality of the desktop image so that less bandwidth
+  is used when refreshing the screens. Once the TurboVNC is installed, you can
   connect to your running instance using the convention: **W.X.Y.Z:1**, where
   W.X.Y.Z is the IP address of the instance provided in the email. You will use
   the same passphrase as the connection password. You can also check the email
   sent by the MorphoCloudPortal for more instructions on using TurboVNC.
 
-- **Instance GUI doesn't scale correctly (i.e., fonts too small/large):** Try using **TurboVNC** client for connecting to the instance. TurboVNC handles the high-resolution DPI scaling and resizing the application window much better than the web browser connections.   
+- **Instance GUI doesn't scale correctly (i.e., fonts too small/large):** Try
+  using **TurboVNC** client for connecting to the instance. TurboVNC handles the
+  high-resolution DPI scaling and resizing the application window much better
+  than the web browser connections.
 
-- **3D rendering performance of Slicer appears slow:**, You need to make sure: (1) 3D
-  Slicer is actually using the GPU, and (2) GPU on the instance is functional. For
-  the first issue, make sure you are always launching the Slicer from the
-  shortcut on the desktop. For the latter, open a terminal window and type the
-  command `nvidia-smi`. This should list the GPU in your system, its driver and
-  CUDA version, along with the applications using it (e.g., if Slicer is
-  running, it should be listed). If there is any error, please copy and paste
+- **3D rendering performance of Slicer appears slow:**, You need to make sure:
+  (1) 3D Slicer is actually using the GPU, and (2) GPU on the instance is
+  functional. For the first issue, make sure you are always launching the Slicer
+  from the shortcut on the desktop. For the latter, open a terminal window and
+  type the command `nvidia-smi`. This should list the GPU in your system, its
+  driver and CUDA version, along with the applications using it (e.g., if Slicer
+  is running, it should be listed). If there is any error, please copy and paste
   the full screenshot and notify us. Sometimes rebooting the system from the
   command line via the command `sudo reboot`, helps clear the issue.
 

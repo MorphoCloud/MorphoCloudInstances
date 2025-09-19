@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: approve command
         id: approve_command
-        uses: github/command@v2.0.1
+        uses: github/command@v2.0.2
         with:
           command: "/approve"
           reaction: "rocket"
@@ -24,7 +24,7 @@ jobs:
 
       - name: unapprove command
         id: unapprove_command
-        uses: github/command@v2.0.1
+        uses: github/command@v2.0.2
         with:
           command: "/unapprove"
           reaction: "rocket"
@@ -60,7 +60,7 @@ jobs:
           UNAPPROVE_COMMAND_CONTINUE:
             ${{ steps.unapprove_command.outputs.continue }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Update approval
         id: update_approval

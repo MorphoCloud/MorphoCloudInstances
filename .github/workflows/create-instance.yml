@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: create command
         id: create_command
-        uses: github/command@v2.0.1
+        uses: github/command@v2.0.2
         with:
           command: "/create"
           reaction: "rocket"
@@ -23,11 +23,11 @@ jobs:
             "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
             github.event.issue.user.login }}"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name:
           Convenienty add "request:approved" label if comment added by an admin
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const admins = process.env.MORPHOCLOUD_GITHUB_ADMINS.split(',').map(s => s.trim());

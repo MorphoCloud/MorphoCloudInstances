@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: unshelve command
         id: unshelve_command
-        uses: github/command@v2.0.1
+        uses: github/command@v2.0.2
         with:
           command: "/unshelve"
           reaction: "rocket"
@@ -32,7 +32,7 @@ jobs:
 
       - name: shelve command
         id: shelve_command
-        uses: github/command@v2.0.1
+        uses: github/command@v2.0.2
         with:
           command: "/shelve"
           reaction: "rocket"
@@ -44,7 +44,7 @@ jobs:
 
       - name: delete command
         id: delete_command
-        uses: github/command@v2.0.1
+        uses: github/command@v2.0.2
         with:
           command: "/delete_instance"
           reaction: "rocket"
@@ -87,7 +87,7 @@ jobs:
           SHELVE_COMMAND_CONTINUE: ${{ steps.shelve_command.outputs.continue }}
           DELETE_COMMAND_CONTINUE: ${{ steps.delete_command.outputs.continue }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Control instance
         id: control_instance

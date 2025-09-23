@@ -126,17 +126,18 @@ then retry connecting from GUI.
 
 ## Funding & Acknowledgement
 
-MorphoCloud services, including MorphoCloud OnDemand Instances, are supported by
-funding from National Science Foundation (DBI/2301405) and National Institutes
-of Health (NICHD/HD104435). MorphoCloud runs on cyberinfrastructure that is made
-available by current and previous funding from by National Science Foundation
-(Jetstream2: OAC/2005506, Exosphere: TI/2229642). Initial development of
-SlicerMorph was previously supported by National Science Foundation
+MorphoCloud services, including MorphoCloud On-Demand Instances, are supported
+by funding from the National Science Foundation (DBI/2301405) and National
+Institutes of Health (NICHD/HD104435). MorphoCloud runs on cyberinfrastructure
+that is made available by current and previous funding from the National Science
+Foundation (JetStream2: OAC/2005506, Exosphere: TI/2229642). Initial development
+of SlicerMorph was previously supported by National Science Foundation
 (DBI/1759883).
 
 If you use any of the MorphoCloud services for your project, please acknowledge
 our funders with this statement:
 
-“This study relied on cyberinstructure supported by grants from National Science
-Foundation (MorphoCloud: DBI/2301405; JetStream2: OAC/2005506; Exosphere:
-TI/2229642) and National Institutes of Health (MorphoCloud: NICHD HD104435).”
+> This study relied on cyberinfrastructure supported by grants from the National
+> Science Foundation (MorphoCloud: DBI/2301405; JetStream2: OAC/2005506;
+> Exosphere: TI/2229642) and the National Institutes of Health (MorphoCloud:
+> NICHD HD104435).

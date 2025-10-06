@@ -61,7 +61,7 @@ jobs:
 
       - name: command results comment (Instance management not approved)
         if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -113,7 +113,7 @@ jobs:
 
       - name: comment (Instance already created)
         if: ${{ fromJSON(steps.check_instance.outputs.exists) }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -139,7 +139,7 @@ jobs:
 
       - name: comment (floating IP creation failed)
         if: ${{ steps.ip_create.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -177,7 +177,7 @@ jobs:
 
       - name: comment (volume already exists)
         if: ${{ fromJSON(steps.check_volume.outputs.exists) }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -198,7 +198,7 @@ jobs:
 
       - name: comment (failed to create volume)
         if: ${{ steps.create_volume.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -272,7 +272,7 @@ jobs:
 
       - name: comment (instance creation failed)
         if: ${{ steps.create_instance.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -316,7 +316,7 @@ jobs:
 
       - name: comment (failed to associate IP with instance)
         if: ${{ steps.associated_ip.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -387,7 +387,7 @@ jobs:
 
       - name: comment (maximum wait time exceeded)
         if: ${{ steps.instance_poll.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -423,7 +423,7 @@ jobs:
 
       - name: comment (failed to rename MyData)
         if: ${{ steps.rename_mydata.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -466,7 +466,7 @@ jobs:
 
       - name: comment (failed to attach volume)
         if: ${{ steps.attach_volume.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -516,7 +516,7 @@ jobs:
 
       - name: comment (failed to copy installed files from MyData-tmp to MyData)
         if: ${{ steps.copy_installed_files.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -540,7 +540,7 @@ jobs:
 
       - name: comment (failed to create /home/exouser/.Renviron)
         if: ${{ steps.create_renviron_file.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -596,7 +596,7 @@ jobs:
 
       - name: comment (failed to reboot instance)
         if: ${{ steps.reboot_instance.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -624,7 +624,7 @@ jobs:
       - name: comment (failed to set instance properties)
         if:
           ${{ steps.set_instance_properties.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -647,7 +647,7 @@ jobs:
         if:
           ${{ steps.update-request-status-label.outcome == 'failure' &&
           failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -684,7 +684,7 @@ jobs:
 
       - name: comment (failed to send email)
         if: ${{ steps.send_email.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |

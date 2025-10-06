@@ -44,7 +44,7 @@ jobs:
         if:
           ${{ steps.email_command.outputs.continue == 'true' &&
           steps.check_instance.outputs.exists == 'false' }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -68,7 +68,7 @@ jobs:
 
       - name: command results comment (failed)
         if: ${{ steps.send_email.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -80,7 +80,7 @@ jobs:
 
       - name: command results comment (success)
         if: ${{ steps.send_email.outcome == 'success' && success() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |

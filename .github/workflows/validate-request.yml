@@ -179,7 +179,7 @@ jobs:
 
       - name: command results comment (failure)
         if: ${{ failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body: |
@@ -195,7 +195,7 @@ jobs:
           steps.check_email_format.outputs.valid == 'true' &&
           steps.check_confirm_email_format.outputs.valid == 'true' &&
           steps.check_emails_match.outputs.valid == 'true') }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body: |
@@ -213,7 +213,7 @@ jobs:
           steps.check_email_format.outputs.valid == 'false' ||
           steps.check_confirm_email_format.outputs.valid == 'false' ||
           steps.check_emails_match.outputs.valid == 'false') }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body: |

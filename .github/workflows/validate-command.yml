@@ -54,7 +54,7 @@ jobs:
       - name: validatation results comment
         id: validate_comment
         if: ${{ steps.validate.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -64,7 +64,7 @@ jobs:
 
       - name: Append supported commands to failure comment
         if: ${{ steps.validate.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           comment-id: ${{ steps.validate_comment.outputs.comment-id }}
           issue-number: ${{ github.event.issue.number }}
@@ -73,7 +73,7 @@ jobs:
 
       - name: Append action run link to failure comment
         if: ${{ steps.validate.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v4.0.0
+        uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           comment-id: ${{ steps.validate_comment.outputs.comment-id }}
           issue-number: ${{ github.event.issue.number }}

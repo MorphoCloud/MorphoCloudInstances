@@ -73,19 +73,6 @@ jobs:
               echo "Instance: [$instance_name], Created: [$created_at], Lifespan: [$lifespan_days days], Expiration: [$expiration_days days], Days left: [$days_until_expiration]"
 
               if [[ "$days_until_expiration" -le 0 ]]; then
-                echo "Instance ${instance_name} has expired. Unapproving..."
-                set +e
-                gh workflow run approve-instance-from-workflow.yml \
-                  -f issue_number=$issue_number \
-                  -f command_name=unapprove
-                  error_code=$?
-                set -e
-                if [[ $error_code -ne 0 ]]; then
-                  echo "::warning ::Failed to run workflow for unapproving $instance_name."
-                  gh issue comment "$issue_number" \
-                    --body "❌ Failed to unapprove instance. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  continue
-                fi
                 echo "Instance ${instance_name} has expired. Deleting..."
                 set +e
                 gh workflow run control-instance-from-workflow.yml \
@@ -100,6 +87,20 @@ jobs:
                   continue
                 fi
                 gh issue edit $issue_number --add-label "volume:expiration-pending"
+
+                echo "Instance ${instance_name} has expired. Unapproving..."
+                set +e
+                gh workflow run approve-instance-from-workflow.yml \
+                  -f issue_number=$issue_number \
+                  -f command_name=unapprove
+                  error_code=$?
+                set -e
+                if [[ $error_code -ne 0 ]]; then
+                  echo "::warning ::Failed to run workflow for unapproving $instance_name."
+                  gh issue comment "$issue_number" \
+                    --body "❌ Failed to unapprove instance. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  continue
+                fi
 
               elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
                 echo "Instance ${instance_name} will expire soon. Sending warning..."

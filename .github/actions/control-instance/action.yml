@@ -13,6 +13,9 @@ inputs:
     description:
       "Name of the command to execute: create, delete, shelve, unshelve"
     required: true
+  unapprove_after_delete:
+    description: "Whether to unapprove after deleting the instance"
+    default: "false"
   instance_name_prefix:
     description: "Instance name prefix"
     required: true
@@ -38,8 +41,13 @@ runs:
           echo "::error ::Unknown command name 'COMMAND_NAME'. Valid commands are 'create', 'delete', 'shelve' or 'unshelve'."
           exit 1
         fi
+        if [[ ! $UNAPPROVE_AFTER_DELETE =~ ^(false|true)$ ]]; then
+          echo "::error ::Invalid unapprove_after_delete value '$UNAPPROVE_AFTER_DELETE'. Supported values are 'true' or 'false'"
+          exit 1
+        fi
       env:
         COMMAND_NAME: ${{ inputs.command_name }}
+        UNAPPROVE_AFTER_DELETE: ${{ fromJSON(inputs.unapprove_after_delete) }}
 
     - name: Set command expected status
       id: expected_status
@@ -463,6 +471,20 @@ runs:
         issue-number: ${{ inputs.issue_number }}
         body: |
           Instance **${{ steps.define.outputs.instance_name }}** successfully ${{ inputs.command_name }}d ✅
+
+    - name: Unapprove instance
+      if:
+        ${{ inputs.command_name == 'delete' &&
+        fromJSON(inputs.unapprove_after_delete) }}
+      uses: ./.github/actions/update-approval
+      with:
+        issue_number: ${{ inputs.issue_number }}
+        command_name: "unapprove"
+        instance_name_prefix: ${{ inputs.instance_name_prefix }}
+        token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
 
     - name: Update Request Status Label
       uses: ./.github/actions/update-request-status-label

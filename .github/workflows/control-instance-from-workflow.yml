@@ -12,6 +12,10 @@ on:
           "Name of the command to execute: create, delete, shelve, unshelve"
         required: true
         type: string
+      unapprove_after_delete:
+        description: "Whether to unapprove after deleting the instance"
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       issue_number:
@@ -23,6 +27,10 @@ on:
           "Name of the command to execute: create, delete, shelve, unshelve"
         required: true
         type: string
+      unapprove_after_delete:
+        description: "Whether to unapprove after deleting the instance"
+        type: boolean
+        default: false
 permissions:
   issues: write
   checks: read
@@ -50,6 +58,7 @@ jobs:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           issue_number: ${{ inputs.issue_number }}
           command_name: ${{ inputs.command_name }}
+          unapprove_after_delete: ${{ inputs.unapprove_after_delete }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
           string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}

@@ -23,16 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Add comment
-        run: |
-          gh issue comment $ISSUE_NUMBER \
-            -b "<tt>\delete_volume</tt> issued by **delete-volume-from-workflow.yml** workflow. \
-            See details [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})."
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-
       - name: Delete volume
         id: delete_volume
         uses: ./.github/actions/delete-volume

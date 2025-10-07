@@ -181,7 +181,7 @@ runs:
 
         openstack volume delete $volume_id
 
-        gh issue edit $ISSUE_NUMBER --add-label "volume:deleted"
+        gh issue edit $ISSUE_NUMBER --add-label "volume:deleted" --remove-label "volume:expiration-pending"
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
         GH_TOKEN: ${{ inputs.token }}

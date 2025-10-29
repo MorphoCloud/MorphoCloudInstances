@@ -106,10 +106,30 @@ jobs:
                 # Convert uptime from seconds to hours
                 uptime_hours=$(echo "scale=2; $uptime_seconds / 3600" | bc)
               fi
+
+              # Derive timeout_hrs from labels like "timeout:24hrs"
+              timeout_hrs="$(
+                gh issue view "$issue_number" --json labels \
+                  --jq '[.labels[].name
+                        | select(test("^timeout:[0-9]+hrs$"))
+                        | capture(":(?<n>[0-9]+)hrs$").n
+                        | tonumber] | max // empty'
+              )"
+
+              if [[ -z "$timeout_hrs" ]]; then
+                echo "::warning ::No 'timeout:NNhrs' label found for issue $issue_number (defaulting to 4hrs)"
+                timeout_hrs=4
+              elif ! [[ "$timeout_hrs" =~ ^[0-9]+$ ]]; then
+                echo "::warning ::Parsed timeout is not an integer ('$timeout_hrs'); defaulting to 4hrs"
+                timeout_hrs=4
+              fi
+
+              echo "Timeout is set to [$timeout_hrs] hours."
+
               # Check uptime and define action
-              if $(python3 -c "valid=($uptime_hours > 3.5 and $uptime_hours <= 4.0); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
+              if $(python3 -c "valid=($uptime_hours > ($timeout_hrs - 0.5) and $uptime_hours <= $timeout_hrs); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
                 action="notify"
-              elif $(python3 -c "valid=($uptime_hours > 4.0); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
+              elif $(python3 -c "valid=($uptime_hours > $timeout_hrs); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
                 action="shelve"
               else
                 action=""

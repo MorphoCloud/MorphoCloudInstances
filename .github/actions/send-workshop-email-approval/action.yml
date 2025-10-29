@@ -13,11 +13,8 @@ inputs:
   mail_server_password:
     description: "mail server password"
     required: true
-  instance_name:
-    description: "Name of the instance to connect to"
-    required: true
-  instance_issue_number:
-    description: "Reference of the GitHub issue associated with the instance"
+  workshop_issue_number:
+    description: "Reference of the GitHub issue associated with the workshop"
     required: true
 runs:
   using: "composite"
@@ -28,7 +25,7 @@ runs:
       with:
         token: ${{ inputs.token }}
         repository: ${{ github.repository }}
-        issue_number: ${{ inputs.instance_issue_number }}
+        issue_number: ${{ inputs.workshop_issue_number }}
 
     - name: Check if email is encoded
       id: check_email_encryption
@@ -52,6 +49,14 @@ runs:
         operation: "decode"
         skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
 
+    - name: Extract workshop specific fields
+      id: extract_workshop
+      uses: ./.github/actions/extract-workshop-fields
+      with:
+        token: ${{ inputs.token }}
+        repository: ${{ github.repository }}
+        issue_number: ${{ inputs.workshop_issue_number }}
+
     - name: Send approval mail
       uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
       with:
@@ -63,17 +68,15 @@ runs:
         from: MorphoCloudPortal
         to: ${{ steps.decode_email.outputs.output_string }}
         subject:
-          "[${{ github.event.repository.name }}] Approval granted for instance:
-          ${{ inputs.instance_name }}"
+          "[${{ github.event.repository.name }}] Approval granted for workshop
+          #${{ inputs.workshop_issue_number }}"
         convert_markdown: true
         html_body: |
-          ✅ Your request for a MorphoCloud instance has been approved.
+          ✅ Your request for a MorphoCloud workshop has been approved.
 
           **What’s next?**
 
-          - To create a new instance, comment `/create` on the issue.
-          - If you previously shelved an instance, comment `/unshelve` to restore it.
-          - To resend connection details later, use `/email`.
+          - To initiate the creation of ${{ steps.extract_workshop.outputs.number_of_instances }} instances expected to be running for ${{ steps.extract_workshop.outputs.duration_days }} days, comment `/create` on the issue.
 
           _Only one command should be used per comment._
 
@@ -81,15 +84,6 @@ runs:
 
           **Supported Issue Commands:**
 
-          _The following commands can be added as comments to issue [${{ github.repository }}#${{ inputs.instance_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.instance_issue_number }}):_
+          _The following commands can be added as comments to issue [${{ github.repository }}#${{ inputs.workshop_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.workshop_issue_number }}):_
 
-          - `/create`: Create *${{ inputs.instance_name }}*
-          - `/shelve`: Shelve *${{ inputs.instance_name }}*
-          - `/unshelve`: Unshelve *${{ inputs.instance_name }}*
-          - `/encode_email`: Obfuscate the email in the issue
-          - `/decode_email`: Reveal the email in the issue
-          - `/email`: Resend connection instructions
-          - `/renew`: Extend the instance session (if available)
-          - `/delete_instance`: Delete *${{ inputs.instance_name }}*
-          - `/delete_volume`: Delete the associated volume
-          - `/delete_all`: Delete both *${{ inputs.instance_name }}* and its volume
+          - `/create`: Initiate the **${{ steps.extract_workshop.outputs.number_of_instances }}** workshop instances

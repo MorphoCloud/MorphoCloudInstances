@@ -1,0 +1,47 @@
+name: "Request Creation Handler"
+on:
+  issues:
+    types:
+      - opened
+
+permissions:
+  issues: write
+  contents: read
+  checks: read
+
+jobs:
+  call-validate-request:
+    # This applies to both "request-type:instance" and "request-type:workshop"
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/validate-request.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  call-request-labeler:
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-labeler.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  call-request-initial-comments:
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-initial-comments.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  call-request-notify-admin:
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-notify-admin.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit

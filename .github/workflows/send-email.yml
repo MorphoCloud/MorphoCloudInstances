@@ -8,7 +8,8 @@ jobs:
   send-email:
     runs-on: self-hosted
     if:
-      ${{ !github.event.issue.pull_request && (
+      ${{ !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'request-type:instance') && (
       contains(github.event.comment.body, '/email') ) }}
     steps:
       - name: email command

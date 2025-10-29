@@ -17,7 +17,7 @@ on:
       issue_number:
         description: "Issue number"
         required: true
-        type: number
+        type: string
       command_name:
         description:
           "Name of the command to execute: encode_email, decode_email"

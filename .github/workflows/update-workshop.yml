@@ -1,0 +1,214 @@
+name: Update Workshop Status
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    outputs:
+      issue_numbers: ${{ steps.collect.outputs.issue_numbers }}
+    steps:
+      - name: Collect workshops awaiting instance creation
+        id: collect
+        run: |
+          set -euo pipefail
+          issues=$(gh issue list \
+            --repo "$GH_REPO" \
+            --label "request-type:workshop" \
+            --label "workflow:creating-instances" \
+            --state open \
+            --json number \
+            --limit 100)
+          issue_numbers=$(echo "$issues" | jq -c '[.[].number]')
+          if [[ "$issue_numbers" == "null" ]]; then
+            issue_numbers="[]"
+          fi
+          {
+            echo 'issue_numbers<<EOF'
+            echo "$issue_numbers"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+  update:
+    needs: collect
+    if: ${{ needs.collect.outputs.issue_numbers != '[]' }}
+    runs-on: self-hosted
+    strategy:
+      matrix:
+        issue_number: ${{ fromJson(needs.collect.outputs.issue_numbers) }}
+    env:
+      OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+      INSTANCE_PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract common fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ matrix.issue_number }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
+        shell: bash
+        run: |
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+      - name: Extract workshop fields
+        id: extract_workshop
+        uses: ./.github/actions/extract-workshop-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ matrix.issue_number }}
+
+      - name: List workshop instance issues
+        id: list_instances
+        run: |
+          issues=$(
+            gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "repos/$GH_REPO/issues/$ISSUE_NUMBER/sub_issues" \
+              --paginate \
+              | jq -s 'map(.[]) | map({number: .number})'
+          )
+          if [[ -z "$issues" || "$issues" == "null" ]]; then
+            issues="[]"
+          fi
+          {
+            echo 'issues<<EOF'
+            echo "$issues"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ matrix.issue_number }}
+
+      - name: Check instance readiness
+        id: readiness
+        run: |
+          set -euo pipefail
+
+          readarray -t numbers < <(echo "$ISSUES" | jq -r '.[].number')
+          expected="$EXPECTED_COUNT"
+
+          if [[ ${#numbers[@]} -eq 0 || "$expected" == "" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          args=()
+          if [[ -n "$INSTANCE_PREFIX" ]]; then
+            args+=("-p" "$INSTANCE_PREFIX")
+          fi
+          args+=("-w" "$ISSUE_NUMBER")
+
+          credentials_output=$(./scripts/list-instance-credentials.sh "${args[@]}")
+          echo "$credentials_output" > workshop_credentials.csv
+
+          data_lines=$(echo "$credentials_output" | tail -n +2 | sed '/^$/d' | wc -l | tr -d ' ')
+          echo "Detected $data_lines active instances (expected $expected)"
+
+          if [[ "$data_lines" -eq "$expected" && "$expected" -gt 0 ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "csv<<EOF" >> "$GITHUB_OUTPUT"
+          cat workshop_credentials.csv >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ matrix.issue_number }}
+          EXPECTED_COUNT:
+            ${{ steps.extract_workshop.outputs.number_of_instances }}
+          INSTANCE_PREFIX: ${{ env.INSTANCE_PREFIX }}
+          ISSUES: ${{ steps.list_instances.outputs.issues }}
+
+      - name: Update workshop labels
+        if: ${{ steps.readiness.outputs.ready == 'true' }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" \
+            --remove-label "workflow:creating-instances" \
+            --add-label "workflow:instances-created"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ matrix.issue_number }}
+
+      - name: Build email content
+        id: email_content
+        if: ${{ steps.readiness.outputs.ready == 'true' }}
+        run: |
+          printf 'body<<EOF\n' >> "$GITHUB_OUTPUT"
+          printf 'The workshop instances requested in #%s are now active.\n\n' "$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+          printf '| Instance | SSH | Web connect | Passphrase |\n' >> "$GITHUB_OUTPUT"
+          printf '| --- | --- | --- | --- |\n' >> "$GITHUB_OUTPUT"
+
+          printf '%s\n' "$CSV" | tail -n +2 | sed '/^$/d' | while IFS=',' read -r instance ssh web passphrase; do
+            printf '| %s | `%s` | [%s](%s) | `%s` |\n' "$instance" "$ssh" "$web" "$web" "$passphrase" >> "$GITHUB_OUTPUT"
+          done
+
+          printf '\nEOF\n' >> "$GITHUB_OUTPUT"
+        env:
+          ISSUE_NUMBER: ${{ matrix.issue_number }}
+          CSV: ${{ steps.readiness.outputs.csv }}
+
+      - name: Send workshop email
+        if: ${{ steps.readiness.outputs.ready == 'true' }}
+        uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: MorphoCloudPortal
+          to: ${{ steps.decode_email.outputs.output_string }}
+          subject:
+            "[${{ github.event.repository.name }}] Workshop #${{
+            matrix.issue_number }} instances ready"
+          convert_markdown: true
+          html_body: ${{ steps.email_content.outputs.body }}
+
+      - name: Comment on workshop issue
+        if: ${{ steps.readiness.outputs.ready == 'true' }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "**All workshop instances are active.** Notification email sent."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ matrix.issue_number }}

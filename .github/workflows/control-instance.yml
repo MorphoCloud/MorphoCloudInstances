@@ -13,7 +13,8 @@ jobs:
   control:
     runs-on: self-hosted
     if:
-      ${{ !github.event.issue.pull_request && (
+      ${{ !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'request-type:instance') && (
       contains(github.event.comment.body, '/unshelve') ||
       contains(github.event.comment.body, '/shelve') ||
       contains(github.event.comment.body, '/delete_instance') ) }}

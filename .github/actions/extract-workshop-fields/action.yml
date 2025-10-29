@@ -1,0 +1,68 @@
+name: "Extract workshop fields"
+description: "Extract workshop request fields"
+inputs:
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  repository:
+    description: "The full name of the repository in which the issue exists"
+    required: true
+  issue_number:
+    description: "Issue number identifying the workshop request"
+    required: true
+outputs:
+  description:
+    description: "Workshop description"
+    value: ${{ steps.extract.outputs.description }}
+  duration_days:
+    description: "Workshop duration in days"
+    value: ${{ steps.extract.outputs.duration_days }}
+  number_of_instances:
+    description: "Number of instances requested"
+    value: ${{ steps.extract.outputs.number_of_instances }}
+runs:
+  using: "composite"
+  steps:
+    - name: Fetch the issue
+      id: read_issue_body
+      shell: bash
+      run: |
+        echo "body<<EOF" >> $GITHUB_OUTPUT
+        gh issue view ${{ inputs.issue_number }} \
+          --repo ${{ inputs.repository }} \
+          --json body \
+          --jq .body >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Issue Forms Body Parser
+      id: parse
+      uses: zentered/issue-forms-body-parser@v2.2.0
+      with:
+        body: ${{ steps.read_issue_body.outputs.body }}
+
+    - name: Display parsed data
+      shell: bash
+      run: |
+        printf '%s\n' "$DATA" | jq -r .
+      env:
+        DATA: ${{ steps.parse.outputs.data }}
+
+    - name: Extract fields
+      id: extract
+      shell: bash
+      run: |
+        duration_days=$(
+          printf '%s\n' "$DATA" |
+          jq -r '."duration-days".text'
+        )
+        echo "duration_days=$duration_days" >> $GITHUB_OUTPUT
+
+        number_of_instances=$(
+          printf '%s\n' "$DATA" |
+          jq -r '."number-of-instances".text'
+        )
+        echo "number_of_instances=$number_of_instances" >> $GITHUB_OUTPUT
+      env:
+        DATA: ${{ steps.parse.outputs.data }}

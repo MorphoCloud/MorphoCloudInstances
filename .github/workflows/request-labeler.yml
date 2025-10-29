@@ -1,8 +1,16 @@
 name: "Instance Request Labeler"
 on:
-  issues:
-    types:
-      - opened
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: string
 
 permissions:
   issues: write
@@ -12,6 +20,20 @@ jobs:
   labeler:
     runs-on: ubuntu-latest
     steps:
+      - name: Collect Inputs
+        id: collect_inputs
+        run: |
+          echo "EVENT_NAME [$EVENT_NAME]"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "workflow_call" ]]; then
+            issue_number=${{ github.event.inputs.issue_number }}
+          else
+            echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"
+            exit 1
+          fi
+          echo "issue_number=$issue_number" >> $GITHUB_OUTPUT
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+
       - uses: actions/checkout@v5
 
       - name: Extract issue fields
@@ -20,14 +42,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
-          issue_number: ${{ github.event.issue.number }}
+          issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
 
       - name: Add flavor label
         run: gh issue edit "$NUMBER" --add-label "$LABELS"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          NUMBER: ${{ github.event.issue.number }}
+          NUMBER: ${{ steps.collect_inputs.outputs.issue_number }}
           LABELS: flavor:${{ steps.extract.outputs.instance_flavor }}
 
       - name: Add expiration labels
@@ -35,5 +57,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          NUMBER: ${{ github.event.issue.number }}
+          NUMBER: ${{ steps.collect_inputs.outputs.issue_number }}
           LABELS: "expiration:60d,expiration:120d"

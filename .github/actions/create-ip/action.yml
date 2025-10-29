@@ -10,8 +10,11 @@ inputs:
     description: "If already created and unassigned, IP address to return"
 outputs:
   floating_ip_address:
-    description: "Retrieved or created floating IP"
+    description: "Retrieved or created floating IP address"
     value: ${{ steps.define_output.outputs.floating_ip_address }}
+  floating_ip_uuid:
+    description: "Retrieved or created floating IP UUID"
+    value: ${{ steps.define_output.outputs.floating_ip_uuid }}
 runs:
   using: "composite"
   steps:

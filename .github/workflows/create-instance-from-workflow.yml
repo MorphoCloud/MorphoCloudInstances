@@ -1,0 +1,60 @@
+name: Create Instance from Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: number
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: string
+
+permissions:
+  issues: write
+  contents: read
+  checks: read
+
+jobs:
+  call-validate-request:
+    uses: ./.github/workflows/validate-request.yml
+    with:
+      issue_number: "${{ inputs.issue_number }}"
+    secrets: inherit
+
+  call-request-labeler:
+    uses: ./.github/workflows/request-labeler.yml
+    with:
+      issue_number: "${{ inputs.issue_number }}"
+    secrets: inherit
+
+  call-request-initial-comments:
+    uses: ./.github/workflows/request-initial-comments.yml
+    with:
+      issue_number: "${{ inputs.issue_number }}"
+    secrets: inherit
+
+  control:
+    runs-on: self-hosted
+    needs:
+      - call-validate-request
+      - call-request-labeler
+      - call-request-initial-comments
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Create instance
+        uses: ./.github/actions/create-instance
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          issue_number: ${{ inputs.issue_number }}
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          volume_name_suffix: ${{ vars.VOLUME_NAME_PREFIX }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}

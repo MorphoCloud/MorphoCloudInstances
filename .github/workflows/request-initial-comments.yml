@@ -1,13 +1,16 @@
 name: "Instance Request Initial Comments"
 on:
-  issues:
-    types:
-      - opened
   workflow_dispatch:
     inputs:
       issue_number:
         description: "Issue number"
         required: true
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: string
 
 jobs:
   initial_comments:
@@ -17,9 +20,7 @@ jobs:
         id: collect_inputs
         run: |
           echo "EVENT_NAME [$EVENT_NAME]"
-          if [[ "$EVENT_NAME" == "issues" ]]; then
-            issue_number=${{ github.event.issue.number }}
-          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "workflow_call" ]]; then
             issue_number=${{ github.event.inputs.issue_number }}
           else
             echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"

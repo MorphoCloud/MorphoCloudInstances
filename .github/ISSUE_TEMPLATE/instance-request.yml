@@ -1,0 +1,65 @@
+name: Instance Request
+description: Issue template to request an individual cloud instance.
+title: "Instance: "
+labels:
+  - request-type:instance
+  - request-creator:user
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        _Please enter a short description of your project in the title bar above this text, followed by your Full Name. E.g.,: "Instance: 3D analysis of bryozoans; Jane Doe"_
+
+  - type: dropdown
+    attributes:
+      label: Cloud Computing Instance Flavor
+      description: Select the type of cloud-computing instance to create.
+      options:
+        - g3.large - GPU instance (16 CPUs, 60 GB RAM and 50% of A100 GPU)
+        - g3.xl - GPU instance (32 CPUs, 125 GB RAM and A100 GPU)
+        - m3.xl - General-purpose instance (32 CPUs, 125 GB RAM)
+        - r3.large - Large Memory instance (64 CPUs, 500 GB RAM)
+        - r3.xl - Large Memory instance (128 CPUs, 1000 GB RAM)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Description
+      description:
+        Briefly describe what your project is, your usage needs and how you will
+        be using the instance. Approval of the request is contingent upon a
+        valid use case in the domain of 3D digital morphology. E.g., "I am PhD
+        candidate in XYZ University working on 3D morphometrics of fossil
+        bryozoans. I have microCT scans of 100s specimens, and would like to use
+        SlicerMorph to segment and extract models"._
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: ORCID
+      description: Enter your ORCID iD for identification purposes.
+      placeholder: 0000-0000-0000-0000
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Email
+      description:
+        Enter the email address that should receive notifications about the
+        instance. Ensure this is a valid, regularly checked email.
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Confirm Email
+      description:
+        Re-enter your email address to verify it is correct. This step ensures
+        that notifications are sent to the correct address. Please double-check
+        for typos.
+    validations:
+      required: true

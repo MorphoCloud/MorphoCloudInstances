@@ -3,13 +3,18 @@ name: Validate Request
 on:
   issues:
     types:
-      - opened
       - edited
   workflow_dispatch:
     inputs:
       issue_number:
         description: "Issue number"
         required: true
+  workflow_call:
+    inputs:
+      issue_number:
+        description: "Issue number"
+        required: true
+        type: string
 
 # Permissions needed for reacting to IssueOps commands on issues
 permissions:
@@ -26,7 +31,7 @@ jobs:
           echo "EVENT_NAME [$EVENT_NAME]"
           if [[ "$EVENT_NAME" == "issues" ]]; then
             issue_number=${{ github.event.issue.number }}
-          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "workflow_call" ]]; then
             issue_number=${{ github.event.inputs.issue_number }}
           else
             echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"
@@ -177,15 +182,24 @@ jobs:
           COMMAND_NAME: encode_email
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
+      - name: find command results comment
+        uses: peter-evans/find-comment@v4
+        id: fc
+        with:
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          body-includes: "### Validation Results"
+
       - name: command results comment (failure)
         if: ${{ failure() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          edit-mode: replace
           body: |
-            ### Command Results ❌
+            ### Validation Results
 
-            `/validate` command failed.
+            The validation checks failed ❌.
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -197,7 +211,9 @@ jobs:
           steps.check_emails_match.outputs.valid == 'true') }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          edit-mode: replace
           body: |
             ### Validation Results
 
@@ -215,7 +231,9 @@ jobs:
           steps.check_emails_match.outputs.valid == 'false') }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          edit-mode: replace
           body: |
             ### Validation Results
 

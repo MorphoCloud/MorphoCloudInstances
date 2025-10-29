@@ -11,9 +11,15 @@ inputs:
     description: "Issue number identifying the issue to extract fields from"
     required: true
 outputs:
+  title:
+    description: "Request title"
+    value: ${{ steps.read_issue_title.outputs.title }}
   instance_flavor:
     description: "Instance flavor"
     value: ${{ steps.extract.outputs.instance_flavor }}
+  description:
+    description: "Request description"
+    value: ${{ steps.extract.outputs.title }}
   orcid:
     description: "ORCID iD"
     value: ${{ steps.extract.outputs.orcid }}
@@ -26,6 +32,19 @@ outputs:
 runs:
   using: "composite"
   steps:
+    - name: Fetch the issue title
+      id: read_issue_title
+      shell: bash
+      run: |
+        echo "title<<EOF" >> $GITHUB_OUTPUT
+        gh issue view ${{ inputs.issue_number }} \
+          --repo ${{ inputs.repository }} \
+          --json title \
+          --jq .title >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
     - name: Fetch the issue
       id: read_issue_body
       shell: bash
@@ -66,6 +85,14 @@ runs:
           jq -r ".orcid.text"
         )
         echo "orcid=$orcid" >> $GITHUB_OUTPUT
+
+        description=$(
+          printf '%s\n' "$DATA" |
+          jq -r '.description.text'
+        )
+        echo "description<<EOF" >> $GITHUB_OUTPUT
+        printf '%s\n' "$description" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
 
         # Also strip "<" and ">" to convert from "<name@domain.org>" to "name@domain.org"
         email=$(

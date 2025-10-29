@@ -1,0 +1,222 @@
+name: Create Workshop Instances
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    if:
+      ${{ !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'request-type:workshop') &&
+      contains(github.event.comment.body, '/create') }}
+    steps:
+      - name: create command
+        id: create_command
+        uses: github/command@v2.0.2
+        with:
+          command: "/create"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "write,maintain,admin"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+
+      - uses: actions/checkout@v5
+        if: ${{ steps.create_command.outputs.continue == 'true' }}
+
+      - name: Check workflow management approval
+        id: check_approval
+        uses: ./.github/actions/check-approval
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: command results comment (Workflow management not approved)
+        if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `/create` command failed because management of **Workshop ${{ github.event.issue.number }}** has not been approved yet.
+
+      - name: Workflow management not approved (failure)
+        if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+        shell: bash
+        run: |
+          echo "::error ::Workflow $ISSUE_NUMBER management not approved"
+          exit 1
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+
+      - name: Extract common fields
+        id: extract
+        if: ${{ steps.create_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Extract workshop fields
+        id: extract_workshop
+        if: ${{ steps.create_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/extract-workshop-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Update workshop labels
+        if: ${{ steps.create_command.outputs.continue == 'true' }}
+        run: |
+          gh issue edit "$ISSUE_NUMBER" \
+            --add-label "request:approved,workflow:creating-instances"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+
+      - uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Create instance issues
+        if: ${{ steps.create_command.outputs.continue == 'true' }}
+        run: |
+          set -euo pipefail
+
+          NUMBER_OF_INSTANCES=$(echo "$NUMBER_OF_INSTANCES" | tr -d '[:space:]')
+          DURATION_DAYS=$(echo "$DURATION_DAYS" | tr -d '[:space:]')
+
+          if ! [[ "$NUMBER_OF_INSTANCES" =~ ^[0-9]+$ ]]; then
+            echo "::error ::Invalid number of instances [$NUMBER_OF_INSTANCES]"
+            exit 1
+          fi
+
+          if ! [[ "$DURATION_DAYS" =~ ^[0-9]+$ ]]; then
+            echo "::error ::Invalid duration (days) [$DURATION_DAYS]"
+            exit 1
+          fi
+
+          timeout_hours=$((DURATION_DAYS * 24))
+          timeout_label="timeout:${timeout_hours}hrs"
+
+          declare -a requested_instance_issues=()
+
+          gh label create "$timeout_label" --color "5319E7" --description "Instance timeout after ${timeout_hours} hours" --force >/dev/null 2>&1 || true
+
+          for idx in $(seq 1 "$NUMBER_OF_INSTANCES"); do
+            issue_title="Instance: Workshop ${ISSUE_NUMBER} - Participant ${idx} (${REQUEST_TITLE})"
+
+            issue_body=$(python - <<'PY'
+          import os, textwrap
+
+          body = textwrap.dedent(f"""### Cloud Computing Instance Flavor
+
+          {os.environ['INSTANCE_FLAVOR']}
+
+          ### Description
+
+          Workshop instance created for Workshop {os.environ['ISSUE_NUMBER']} ({os.environ['REQUEST_TITLE']}).
+
+          {os.environ['REQUEST_DESCRIPTION']}
+
+          ### ORCID
+
+          0000-0000-0000-0000
+
+          ### Email
+
+          {os.environ['WORKSHOP_EMAIL']}
+
+          ### Confirm Email
+
+          {os.environ['WORKSHOP_CONFIRM_EMAIL']}
+          """)
+
+          print(body)
+          PY
+          )
+
+            instance_issue_json=$(
+              gh api \
+                --method POST \
+                -H "Accept: application/vnd.github+json" \
+                "/repos/$GH_REPO/issues" \
+                -f "title=$issue_title" \
+                -f "body=$issue_body" \
+                -f "labels[]=request-type:instance" \
+                -f "labels[]=request:approved" \
+                -f "labels[]=$timeout_label"
+            )
+
+            instance_issue_number=$(echo "$instance_issue_json" | jq -r '.number')
+            instance_issue_id=$(echo "$instance_issue_json" | jq -r '.id')
+
+            requested_instance_issues+=("$instance_issue_number")
+
+            # Get current total before adding
+            before_total="$(gh api "/repos/$GH_REPO/issues/$ISSUE_NUMBER" --jq '.sub_issues_summary.total // 0')"
+
+            # Add the sub-issue and capture the full updated issue JSON
+            issue_json="$(
+              gh api \
+                --method POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "/repos/$GH_REPO/issues/$ISSUE_NUMBER/sub_issues" \
+                -F sub_issue_id=$instance_issue_id
+            )"
+
+            # Read the new total from the response
+            after_total="$(jq -r '.sub_issues_summary.total // 0' <<<"$issue_json")"
+
+            echo "Sub-issues total: before=$before_total after=$after_total"
+
+            # Check it increased by exactly one
+            #if [[ "$after_total" -ne $((before_total + 1)) ]]; then
+            #  echo "::error ::Expected sub_issues_summary.total to increase by 1 (before=${before_total}, after=${after_total})"
+            #  exit 1
+            #fi
+
+            set +e
+            gh workflow run create-instance-from-workflow.yml \
+              -f issue_number=$instance_issue_number
+            error_code=$?
+            set -e
+            if [[ $error_code -ne 0 ]]; then
+              echo "::warning ::Failed to run workflow for creating instance $instance_issue_number"
+              gh issue comment "$instance_issue_number" \
+                --body "❌ Failed to create instance $instance_issue_number. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              continue
+            fi
+
+          done
+
+          if [[ ${#requested_instance_issues[@]} -gt 0 ]]; then
+            comment="Requested ${#requested_instance_issues[@]} workshop instances"
+            gh issue comment "$ISSUE_NUMBER" --body "$comment"
+          fi
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          # Common fields
+          REQUEST_TITLE: ${{ steps.extract.outputs.title }}
+          REQUEST_DESCRIPTION: ${{ steps.extract.outputs.description }}
+          INSTANCE_FLAVOR: ${{ steps.extract.outputs.instance_flavor }}
+          WORKSHOP_EMAIL: ${{ steps.extract.outputs.email }}
+          WORKSHOP_CONFIRM_EMAIL: ${{ steps.extract.outputs.confirm_email }}
+          # Workshop specific fields
+          NUMBER_OF_INSTANCES:
+            ${{ steps.extract_workshop.outputs.number_of_instances }}
+          DURATION_DAYS: ${{ steps.extract_workshop.outputs.duration_days }}

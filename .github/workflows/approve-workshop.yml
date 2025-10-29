@@ -1,4 +1,4 @@
-name: Approve Instance Management
+name: Approve Workshop Management
 
 on:
   issue_comment:
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     if:
       ${{ !github.event.issue.pull_request &&
-      contains(github.event.issue.labels.*.name, 'request-type:instance') && (
+      contains(github.event.issue.labels.*.name, 'request-type:workshop') && (
       contains(github.event.comment.body, '/approve') ||
       contains(github.event.comment.body, '/unapprove')) }}
     steps:
@@ -63,15 +63,63 @@ jobs:
 
       - uses: actions/checkout@v5
 
-      - name: Update approval
-        id: update_approval
-        if: ${{ steps.command.outputs.continue == 'true' }}
-        uses: ./.github/actions/update-approval
+      - name: Remove "request:approved" label
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'unapprove' }}
+        shell: bash
+        run: |
+          gh issue edit $ISSUE_NUMBER --remove-label "request:approved"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+
+      - name: Add "request:approved" label
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'approve' }}
+        shell: bash
+        run: |
+          gh issue edit $ISSUE_NUMBER --add-label "request:approved"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+
+      - name: Send approval mail
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'approve' }}
+        id: send_email
+        uses: ./.github/actions/send-workshop-email-approval
         with:
-          issue_number: ${{ github.event.issue.number }}
-          command_name: ${{ steps.command.outputs.command_name }}
-          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
           string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}
+          workshop_issue_number: ${{ github.event.issue.number }}
+
+      - name: Comment (approval confirmation)
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'approve' }}
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ✅ Workshop management approved by **${{ github.event.comment.user.login }}**.
+
+            @${{ github.event.issue.user.login }} may now use commands such as `/create`.
+
+      - name: command results comment (failure)
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v4.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `/${{ steps.command.outputs.command_name }}` command failed to be applied to this issue.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

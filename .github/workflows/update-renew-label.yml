@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     if:
       ${{ !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'request-type:instance') &&
       contains(github.event.comment.body, '/renew')}}
     steps:
       - name: renew command

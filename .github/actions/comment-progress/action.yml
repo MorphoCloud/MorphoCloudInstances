@@ -22,6 +22,8 @@ inputs:
   send_email:
     description: "Template input set to '', ✅ or ⏳"
     required: true
+  issue-number:
+    description: "The issue to add a comment to."
   comment-id:
     description: "The id of the comment to update."
 outputs:
@@ -82,6 +84,6 @@ runs:
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
         comment-id: ${{ inputs.comment-id }}
-        issue-number: ${{ github.event.issue.number }}
+        issue-number: ${{ inputs.issue-number }}
         body: ${{ steps.template.outputs.result }}
         edit-mode: ${{ steps.edit-mode.outputs.value }}

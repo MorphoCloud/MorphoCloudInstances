@@ -18,6 +18,9 @@ inputs:
   volume_name_suffix:
     description: "Volume name suffix"
     required: true
+  skip_approval_check:
+    description: "Whether to skip instance management approval check"
+    default: "false"
 runs:
   using: "composite"
   steps:
@@ -30,13 +33,16 @@ runs:
 
     - name: Check instance management approval
       id: check_approval
+      if: ${{ ! fromJSON(inputs.skip_approval_check) }}
       uses: ./.github/actions/check-approval
       with:
         token: ${{ inputs.token }}
         issue_number: ${{ inputs.issue_number }}
 
     - name: command results comment (Instance management not approved)
-      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+      if:
+        ${{ ! fromJSON(inputs.skip_approval_check) && !
+        fromJSON(steps.check_approval.outputs.is_approved) }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
@@ -46,7 +52,9 @@ runs:
           `/delete_volume` command failed because management of **${{ steps.define.outputs.instance_name }}** has not been approved yet.
 
     - name: instance management not approved (failure)
-      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+      if:
+        ${{ ! fromJSON(inputs.skip_approval_check) && !
+        fromJSON(steps.check_approval.outputs.is_approved) }}
       shell: bash
       run: |
         echo "::error ::Instance $INSTANCE_NAME management not approved"

@@ -143,7 +143,8 @@ jobs:
             if [[ "$days_until_expiration" -le 0 ]]; then
               echo "🚨 Volume ${volume_name} has expired. Deleting..."
               gh workflow run delete-volume-from-workflow.yml \
-                -f issue_number=$issue_number
+                -f issue_number=$issue_number \
+                -f skip_approval_check=true
                 error_code=$?
               set -e
               if [[ $error_code -ne 0 ]]; then

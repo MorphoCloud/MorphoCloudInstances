@@ -33,7 +33,7 @@ runs:
       uses: ./.github/actions/check-approval
       with:
         token: ${{ inputs.token }}
-        issue_number: ${{ github.event.issue.number }}
+        issue_number: ${{ inputs.issue_number }}
 
     - name: command results comment (Instance management not approved)
       if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
@@ -72,7 +72,7 @@ runs:
       if: ${{ steps.check_volume.outputs.exists == 'false' }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
-        issue-number: ${{ github.event.issue.number }}
+        issue-number: ${{ inputs.issue_number }}
         body: |
           ### Command Results ❌
 
@@ -156,7 +156,7 @@ runs:
       if: ${{ steps.detach_volume.outcome == 'failure' && failure() }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
-        issue-number: ${{ github.event.issue.number }}
+        issue-number: ${{ inputs.issue_number }}
         body: |
           ### Command Results ❌
 
@@ -193,7 +193,7 @@ runs:
       if: ${{ steps.delete_volume.outcome == 'failure' && failure() }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
-        issue-number: ${{ github.event.issue.number }}
+        issue-number: ${{ inputs.issue_number }}
         body: |
           ### Command Results ❌
 

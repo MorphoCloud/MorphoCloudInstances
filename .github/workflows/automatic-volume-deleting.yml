@@ -86,6 +86,11 @@ jobs:
 
             echo "→ Extracted issue number: [$issue_number]"
 
+            if ! gh issue view "$issue_number" --json number >/dev/null 2>&1; then
+              echo "⚠️ Skipping volume [$volume_name]: No GitHub issue #$issue_number found."
+              continue
+            fi
+
             # Retrieve time at which the label `volume:expiration-pending` was last added
             labeled_at=$(gh api graphql -F owner='{owner}' -F name='{repo}' -F issue_number="$issue_number" -f query='
             query($owner: String!, $name: String!, $issue_number: Int!) {

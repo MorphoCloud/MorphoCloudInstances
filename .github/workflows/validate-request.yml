@@ -27,14 +27,19 @@ jobs:
     steps:
       - name: Collect Inputs
         id: collect_inputs
+        shell: bash
         run: |
           echo "EVENT_NAME [$EVENT_NAME]"
           if [[ "$EVENT_NAME" == "issues" ]]; then
-            issue_number=${{ github.event.issue.number }}
-          elif [[ "$EVENT_NAME" == "workflow_dispatch" || "$EVENT_NAME" == "workflow_call" ]]; then
+            issue_number=${{ github.event.issue.number || inputs.issue_number }}
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             issue_number=${{ github.event.inputs.issue_number }}
           else
             echo "::error ::Unsupported EVENT_NAME [$EVENT_NAME]"
+            exit 1
+          fi
+          if [[ -z "$issue_number" || "$issue_number" == "null" ]]; then
+            echo "::error ::issue_number not provided"
             exit 1
           fi
           echo "issue_number=$issue_number" >> $GITHUB_OUTPUT

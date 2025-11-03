@@ -123,6 +123,7 @@ then retry connecting from GUI.
   is running, it should be listed). If there is any error, please copy and paste
   the full screenshot and notify us. Sometimes rebooting the system from the
   command line via the command `sudo reboot`, helps clear the issue.
+- **I checked, but 3D rendering performance of Slicer still very slow, application window is unresponsive:** Try to stop volume rendering (turn it off). See if any dimension of the your volume is equal to or greater than 4096 voxels. If so, use CropVolume module in Slicer to downsample those dimensions to 4095 or less. Note that this appears to be a specific problem with the drivers provided on the MorphoCloud host (JetStream2), and does not happen in other systems.
 
 ## Funding & Acknowledgement
 

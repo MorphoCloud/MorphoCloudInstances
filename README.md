@@ -23,7 +23,7 @@ In a nutshell, you:
 | Flavor | RAM    | Cores | GPU         | Storage | Use Cases |
 | ------ | ------ | ----- | ----------- | ------- | --------- | 
 | g3.l\* | 60GB   | 16    | A100 (20GB) | 100GB   | General purpose morphology and morphometrics |
-| g3.xl  | 125GB  | 32    | A100 (40GB) | 100GB   | Photogrammetry, NNInteractive |
+| g3.xl  | 125GB  | 32    | A100 (40GB) | 100GB   | Photogrammetry, NNInteractive, AI applications |
 | m3.x   | 250GB  | 64    | None        | 100GB   | Computationally intense tasks that don't require GPU; eg., Image registration with ANTsPy |
 | r3.l   | 500GB  | 64    | None        | 100GB   | Image registration with larger dataset |
 | r3.xl  | 1000GB | 128   | None        | 100GB   | Image registration with larger dataset |

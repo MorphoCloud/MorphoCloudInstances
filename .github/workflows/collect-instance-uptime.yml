@@ -13,7 +13,7 @@ jobs:
   collect-instance-uptime:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Define metadata
         id: define-metadata
@@ -42,7 +42,7 @@ jobs:
           BRANCH: ${{ steps.define-metadata.outputs.branch }}
           DIRECTORY: ${{ steps.define-metadata.outputs.directory }}
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: instance-uptime-data
           path: ${{ steps.define-metadata.outputs.directory }}

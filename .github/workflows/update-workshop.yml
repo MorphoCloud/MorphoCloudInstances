@@ -50,7 +50,7 @@ jobs:
       OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
       INSTANCE_PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Extract common fields
         id: extract

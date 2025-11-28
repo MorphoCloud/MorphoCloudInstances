@@ -39,7 +39,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Define instance name
         id: define

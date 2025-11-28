@@ -16,34 +16,29 @@ In a nutshell, you:
 3. You have a github account;
 4. You have an ORCID with a public profile.
 
-Also, note that any use case falls under the category of **Human Subject
-Research** is not allowed on MorphoCloud.
-
-To get more information about these instances, please review
-[this document](https://docs.google.com/document/d/1WRds-QWnDK1MnmEhGUPyBgjE9hitiddcElAPWiAYRg4/edit#heading=h.b0yi3m7wlfk8).
+**NOTE:** MorphoCloud and JetStream2 are designed for open science and public data; it is NOT compliant with high-security federal privacy regulations such as HIPAA or FERPA. Consequently, users are strictly prohibited from uploading, processing, or storing any data containing Personally Identifiable Information or Protected Health Information. 
 
 ## Available Instance Types
 
-| Flavor   | RAM    | Cores | GPU         | **Storage** |
-| -------- | ------ | ----- | ----------- | ----------- |
-| g3.l\*\* | 60GB   | 16    | A100 (20GB) | 100GB       |
-| g3.xl    | 125GB  | 32    | A100 (40GB) | 100GB       |
-| m3.x     | 250GB  | 64    | None        | 100GB       |
-| r3.l     | 500GB  | 64    | None        | 100GB       |
-| r3.xl    | 1000GB | 128   | None        | 100GB       |
+| Flavor | RAM    | Cores | GPU         | Storage | Use Cases |
+| ------ | ------ | ----- | ----------- | ------- | --------- | 
+| g3.l\* | 60GB   | 16    | A100 (20GB) | 100GB   | General purpose morphology and morphometrics |
+| g3.xl  | 125GB  | 32    | A100 (40GB) | 100GB   | Photogrammetry, NNInteractive |
+| m3.x   | 250GB  | 64    | None        | 100GB   | Computationally intense tasks that don't require GPU; eg., Image registration with ANTsPy |
+| r3.l   | 500GB  | 64    | None        | 100GB   | Image registration with larger dataset |
+| r3.xl  | 1000GB | 128   | None        | 100GB   | Image registration with larger dataset |
 
-\*\*g3.l is the default flavor. <br>
+\*`g3.l` is the default instance and is usually more available than other instance flavors.<br>
+
 [Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
 
 ## Ready to give a try?
 
-Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new/choose,
-click **Get Started** and fill in the issue template and choose your instance
-flavor. Your request will be approved within 24h (often faster).
+* **Individual users:** Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new?template=instance-request.yml, fill in the necessary information and choose your instance flavor. Your request will be approved within 24h (often faster). Then, you can create and start using your instance. 
 
-Currently installed 3D Slicer on the MorphoCloud revision is **33836** (from
-August 9, 2025).
-
+* **Workshop or Short-Course organizers:** If you are planning an event (5 days or less) in which participants would need access to MorphoCloud throughout the 
+event, you can fill in the [Workshop Request](https://github.com/MorphoCloud/MorphoCloudInstances/issues/new?template=workshop-request.yml). Please do that at least 2 weeks prior to your planned event. We will get back to you with the necessary instructions on how to setup your environment. 
+ 
 ## MorphoCloud Commands
 
 Once your request is approved you can use these commands to manage your

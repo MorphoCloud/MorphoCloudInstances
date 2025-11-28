@@ -46,7 +46,7 @@ body:
     attributes:
       label: Description
       description:
-        Describe the workshop content, target audience, and your usage needs for
+        Describe the workshop content, dates, target audience, and your usage needs for
         the instances. Approval of the request is contingent upon a valid use
         case in the domain of 3D digital morphology.
     validations:

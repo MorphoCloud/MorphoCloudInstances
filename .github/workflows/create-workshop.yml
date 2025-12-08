@@ -28,7 +28,7 @@ jobs:
             "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
             github.event.issue.user.login }}"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
         if: ${{ steps.create_command.outputs.continue == 'true' }}
 
       - name: Check workflow management approval
@@ -85,7 +85,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
 
-      - uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
+      - uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
         id: app-token
         with:
           app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
@@ -112,9 +112,19 @@ jobs:
           timeout_hours=$((DURATION_DAYS * 24))
           timeout_label="timeout:${timeout_hours}hrs"
 
+          # Calculate expiration for workshop instances: duration + 1 day (24 hours grace period)
+          # Timeline: instances shelve after DURATION_DAYS, then delete 24h later
+          # Example for 3-day workshop:
+          #   T+0h: Instance created
+          #   T+72h: Instance shelves (timeout)
+          #   T+96h: Instance and volume deleted (expiration = 4 days)
+          expiration_days=$((DURATION_DAYS + 1))
+          expiration_label="expiration:${expiration_days}d"
+
           declare -a requested_instance_issues=()
 
           gh label create "$timeout_label" --color "5319E7" --description "Instance timeout after ${timeout_hours} hours" --force >/dev/null 2>&1 || true
+          gh label create "$expiration_label" --color "892368" --description "Instance expires in ${expiration_days} days (24h grace after shelving)" --force >/dev/null 2>&1 || true
 
           for idx in $(seq 1 "$NUMBER_OF_INSTANCES"); do
             issue_title="Instance: Workshop ${ISSUE_NUMBER} - Participant ${idx} (${REQUEST_TITLE})"
@@ -158,7 +168,8 @@ jobs:
                 -f "body=$issue_body" \
                 -f "labels[]=request-type:instance" \
                 -f "labels[]=request:approved" \
-                -f "labels[]=$timeout_label"
+                -f "labels[]=$timeout_label" \
+                -f "labels[]=$expiration_label"
             )
 
             instance_issue_number=$(echo "$instance_issue_json" | jq -r '.number')

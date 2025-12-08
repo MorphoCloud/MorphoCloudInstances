@@ -45,7 +45,7 @@ jobs:
       - call-request-labeler
       - call-request-initial-comments
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - name: Create instance
         uses: ./.github/actions/create-instance

@@ -88,7 +88,7 @@ jobs:
           SHELVE_COMMAND_CONTINUE: ${{ steps.shelve_command.outputs.continue }}
           DELETE_COMMAND_CONTINUE: ${{ steps.delete_command.outputs.continue }}
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - name: Control instance
         id: control_instance

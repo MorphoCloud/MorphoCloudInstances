@@ -11,6 +11,10 @@ on:
         description: "Whether to skip instance management approval check"
         type: boolean
         default: false
+      volume_name_suffix:
+        description: "Volume name suffix (use 'none' for no suffix, omit to use VOLUME_NAME_SUFFIX variable)"
+        type: string
+        required: false
   workflow_call:
     inputs:
       issue_number:
@@ -21,6 +25,10 @@ on:
         description: "Whether to skip instance management approval check"
         type: boolean
         default: false
+      volume_name_suffix:
+        description: "Volume name suffix (use 'none' for no suffix, omit to use VOLUME_NAME_SUFFIX variable)"
+        type: string
+        required: false
 permissions:
   issues: write
   checks: read
@@ -29,7 +37,22 @@ jobs:
   control:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
+
+      - name: Determine volume name suffix
+        id: suffix
+        shell: bash
+        run: |
+          if [[ "$INPUT_SUFFIX" == "none" ]]; then
+            echo "value=" >> $GITHUB_OUTPUT
+          elif [[ -n "$INPUT_SUFFIX" ]]; then
+            echo "value=$INPUT_SUFFIX" >> $GITHUB_OUTPUT
+          else
+            echo "value=$DEFAULT_SUFFIX" >> $GITHUB_OUTPUT
+          fi
+        env:
+          INPUT_SUFFIX: ${{ inputs.volume_name_suffix }}
+          DEFAULT_SUFFIX: ${{ vars.VOLUME_NAME_SUFFIX }}
 
       - name: Delete volume
         id: delete_volume
@@ -39,5 +62,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue_number: ${{ inputs.issue_number }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
-          volume_name_suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
+          volume_name_suffix: ${{ steps.suffix.outputs.value }}
           skip_approval_check: ${{ inputs.skip_approval_check }}

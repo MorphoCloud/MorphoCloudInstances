@@ -1,0 +1,126 @@
+name: "Send workshop email"
+description: "Send email with workshop instance connection details"
+inputs:
+  os_cloud:
+    description:
+      "Name of the OpenStack cloud allocation to select openstack auth settings
+      defined in '.config/openstack/clouds.yaml'"
+    required: true
+  token:
+    description: "GITHUB_TOKEN or repo scoped PAT"
+    required: true
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
+  mail_server_username:
+    description: "mail server username"
+    required: true
+  mail_server_password:
+    description: "mail server password"
+    required: true
+  instance_name:
+    description: "Name of the instance to connect to"
+    required: true
+  instance_issue_number:
+    description: "Reference of the GitHub issue associated with the instance"
+    required: true
+outputs:
+  error_message:
+    description: "Error message describing which steps failed"
+    value: ${{ steps.set_error_message.outputs.error_message }}
+runs:
+  using: "composite"
+  steps:
+    - name: Extract fields
+      id: extract
+      uses: ./.github/actions/extract-issue-fields
+      with:
+        token: ${{ inputs.token }}
+        repository: ${{ github.repository }}
+        issue_number: ${{ inputs.instance_issue_number }}
+
+    - name: Retrieve metadata
+      id: instance_metadata
+      uses: ./.github/actions/retrieve-metadata
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        instance_name: ${{ inputs.instance_name }}
+
+    - name: Generate Guacamole Connection URL
+      id: guacamole
+      uses: ./.github/actions/generate-connection-url
+      with:
+        instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
+
+    - name: Check if email is encoded
+      id: check_email_encryption
+      shell: bash
+      run: |
+        if [[ "$EMAIL" != *"@"* ]]; then
+          encoded="true"
+        else
+          encoded="false"
+        fi
+        echo "encoded=$encoded" >> $GITHUB_OUTPUT
+      env:
+        EMAIL: ${{ steps.extract.outputs.email }}
+
+    - name: Decode email
+      id: decode_email
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "decode"
+        skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+    - name: Send mail
+      uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
+      with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        secure: true
+        username: ${{ inputs.mail_server_username }}
+        password: ${{ inputs.mail_server_password }}
+        from: MorphoCloudPortal
+        to: ${{ steps.decode_email.outputs.output_string }}
+        subject:
+          "[${{ github.event.repository.name }}] Workshop Instance ${{
+          inputs.instance_name }} active"
+        convert_markdown: true
+        html_body: |
+          Your MorphoCloud workshop instance is up and running:
+
+          * **Graphical User Interface (GUI)**: Use the URL provided to connect from a web browser. For improved performance and responsiveness, you may also use a dedicated TurboVNC client.
+          * **Command Line Access**: Use the SSH information provided below to access your instance from the command line.
+
+          In both cases, username is **exouser** and the passphrase is provided.
+
+          If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
+
+          **Connection Methods:**
+
+          - TurboVNC: `${{ steps.instance_metadata.outputs.instance_ip }}:1`
+          - Web connect: ${{ steps.guacamole.outputs.connection_url }}
+          - SSH: `ssh exouser@${{ steps.instance_metadata.outputs.instance_ip }}`
+
+          **Credentials:**
+
+          - Username: **exouser**
+          - Passphrase: `${{ steps.instance_metadata.outputs.instance_pwd }}`
+
+    - name: Set error message
+      id: set_error_message
+      if: ${{ failure() }}
+      shell: bash
+      run: |
+        if [[ $INSTANCE_METADATA_OUTCOME == "failure" ]]; then
+          error_message="Failed to retrieve metadata"
+        elif [[ $GUACAMOLE_OUTCOME == "failure" ]]; then
+          error_message="Failed to generate connection URL"
+        fi
+        echo "error_message=$error_message" >> $GITHUB_OUTPUT
+      env:
+        # Step outcome
+        INSTANCE_METADATA_OUTCOME: ${{ steps.instance_metadata.outcome }}
+        GUACAMOLE_OUTCOME: ${{ steps.guacamole.outcome }}

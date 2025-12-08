@@ -18,7 +18,7 @@ jobs:
   send-renewal-email:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - name: Define instance name
         id: define

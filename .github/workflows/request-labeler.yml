@@ -41,7 +41,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - name: Extract issue fields
         id: extract
@@ -60,7 +60,16 @@ jobs:
           LABELS: flavor:${{ steps.extract.outputs.instance_flavor }}
 
       - name: Add expiration labels
-        run: gh issue edit "$NUMBER" --add-label "$LABELS"
+        run: |
+          # Check if issue already has an expiration label (e.g., from workshop creation)
+          existing_expiration=$(gh issue view "$NUMBER" --json labels --jq '[.labels[].name | select(test("^expiration:"))] | length')
+          
+          if [[ "$existing_expiration" -eq 0 ]]; then
+            echo "No expiration labels found, adding default expiration labels"
+            gh issue edit "$NUMBER" --add-label "$LABELS"
+          else
+            echo "Issue already has expiration label(s), skipping default expiration labels"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}

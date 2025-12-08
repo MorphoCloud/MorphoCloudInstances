@@ -1,0 +1,198 @@
+# TEST WORKFLOW: Manual testing of workshop instance deletion
+# This workflow allows immediate testing without waiting for the daily cron.
+# DELETE THIS FILE before merging to production.
+name: "[TEST] Workshop Deletion"
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to test deletion on"
+        required: true
+        type: number
+      dry_run:
+        description: "Dry run (don't actually delete, just log what would happen)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  test-delete:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Test workshop deletion for issue ${{ inputs.issue_number }}
+        run: |
+          source ~/venv/bin/activate
+
+          issue_number="${{ inputs.issue_number }}"
+          dry_run="${{ inputs.dry_run }}"
+          instance_prefix=${PREFIX:+${PREFIX}_}
+          instance_name="${instance_prefix}instance-${issue_number}"
+
+          echo "========================================"
+          echo "Testing workshop deletion"
+          echo "========================================"
+          echo "Issue number: $issue_number"
+          echo "Instance name: $instance_name"
+          echo "Dry run: $dry_run"
+          echo "========================================"
+
+          # Retrieve issue info
+          echo ""
+          echo "=== Issue Info ==="
+          issue_json=$(gh issue view "$issue_number" --json createdAt,labels,state)
+          echo "$issue_json" | jq .
+
+          created_at=$(echo "$issue_json" | jq -r '.createdAt')
+          labels=$(echo "$issue_json" | jq -r '.labels[].name')
+
+          echo ""
+          echo "=== Expiration Calculation ==="
+          created_at_epoch=$(date -d "$created_at" +%s)
+          current_time_epoch=$(date +%s)
+
+          lifespan_list=$(echo "$labels" | grep -oP '(?<=expiration:)\d+(\.\d+)?' | sort -n)
+          renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1)
+          renewed_count=${renewed_count:-0}
+
+          expiration_days=$(echo "$lifespan_list" | sed -n "$((renewed_count + 1))p")
+          expiration_days=${expiration_days:-0}
+          expiration_time_epoch=$((created_at_epoch + expiration_days * 86400))
+
+          seconds_until_expiration=$((expiration_time_epoch - current_time_epoch))
+          days_until_expiration=$((seconds_until_expiration / 86400))
+
+          echo "Created at: $created_at"
+          echo "Expiration days: $expiration_days"
+          echo "Seconds until expiration: $seconds_until_expiration"
+          echo "Days until expiration: $days_until_expiration"
+          echo "Is workshop (expiration <= 7): $([ "$expiration_days" -le 7 ] && echo 'YES' || echo 'NO')"
+          echo "Is expired (seconds <= 0): $([ "$seconds_until_expiration" -le 0 ] && echo 'YES' || echo 'NO')"
+
+          # Check instance
+          echo ""
+          echo "=== Instance Check ==="
+          instance_json=$(openstack server list -f json | jq --arg name "$instance_name" '.[] | select(.Name == $name)')
+          if [[ -n "$instance_json" ]]; then
+            echo "Instance found:"
+            echo "$instance_json" | jq .
+            instance_id=$(echo "$instance_json" | jq -r '.ID')
+          else
+            echo "Instance NOT found: $instance_name"
+            instance_id=""
+          fi
+
+          # Check volume (workshop volumes have no suffix)
+          echo ""
+          echo "=== Volume Check ==="
+          volume_name="My-Data-${issue_number}"
+          echo "Expected volume name: $volume_name"
+
+          volume_json=$(openstack volume list -f json | jq --arg name "$volume_name" '.[] | select(.Name == $name)')
+          if [[ -n "$volume_json" ]]; then
+            echo "Volume found:"
+            echo "$volume_json" | jq .
+            volume_id=$(echo "$volume_json" | jq -r '.ID')
+          else
+            echo "Volume NOT found: $volume_name"
+            volume_id=""
+          fi
+
+          # Check attachment
+          if [[ -n "$instance_id" && -n "$volume_id" ]]; then
+            echo ""
+            echo "=== Attachment Check ==="
+            is_attached=$(openstack server show "$instance_id" -f json | \
+              jq --arg volume_id "$volume_id" \
+              '[.volumes_attached[]?.id] | index($volume_id) != null')
+            echo "Volume attached to instance: $is_attached"
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "ACTIONS TO TAKE"
+          echo "========================================"
+
+          if [[ "$expiration_days" -le 7 ]]; then
+            echo "✓ Workshop instance (expiration_days=$expiration_days <= 7)"
+
+            if [[ "$seconds_until_expiration" -le 0 ]]; then
+              echo "✓ Instance has expired (seconds=$seconds_until_expiration <= 0)"
+
+              if [[ -n "$volume_id" ]]; then
+                echo "→ WOULD DELETE volume: $volume_name ($volume_id)"
+
+                if [[ "$dry_run" != "true" ]]; then
+                  echo ""
+                  echo "=== EXECUTING: Volume Deletion ==="
+
+                  # Detach if needed
+                  if [[ -n "$instance_id" && "$is_attached" == "true" ]]; then
+                    echo "Detaching volume..."
+                    openstack server remove volume "$instance_id" "$volume_id" || echo "Warning: detach failed"
+                  fi
+
+                  # Delete volume
+                  echo "Deleting volume..."
+                  if openstack volume delete "$volume_id"; then
+                    echo "✅ Volume deleted successfully"
+                    gh issue edit "$issue_number" --add-label "volume:deleted" --remove-label "volume:expiration-pending" || true
+                    gh issue comment "$issue_number" --body "Volume **${volume_name}** successfully deleted ✅ (test workflow)"
+                  else
+                    echo "❌ Volume deletion failed"
+                  fi
+                fi
+              else
+                echo "→ Volume does not exist, skipping volume deletion"
+              fi
+
+              if [[ -n "$instance_id" ]]; then
+                echo "→ WOULD DELETE instance: $instance_name"
+
+                if [[ "$dry_run" != "true" ]]; then
+                  echo ""
+                  echo "=== EXECUTING: Instance Deletion ==="
+                  gh workflow run control-instance-from-workflow.yml \
+                    -f issue_number=$issue_number \
+                    -f command_name=delete \
+                    -f unapprove_after_delete=true
+                  echo "✅ Instance deletion workflow triggered"
+                fi
+              else
+                echo "→ Instance does not exist, skipping instance deletion"
+              fi
+
+            else
+              echo "✗ Instance has NOT expired yet (seconds=$seconds_until_expiration > 0)"
+              echo "→ No action would be taken"
+            fi
+          else
+            echo "✗ NOT a workshop instance (expiration_days=$expiration_days > 7)"
+            echo "→ Would use regular deletion flow (volume:expiration-pending label)"
+          fi
+
+          echo ""
+          echo "========================================"
+          if [[ "$dry_run" == "true" ]]; then
+            echo "DRY RUN COMPLETE - No changes made"
+          else
+            echo "EXECUTION COMPLETE"
+          fi
+          echo "========================================"
+
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}

@@ -87,6 +87,19 @@ runs:
             --jq '[.labels[].name | select(. | startswith("flavor:")) | split(":")[1]][0]'
         )
         echo "instance_flavor=$instance_flavor" >> $GITHUB_OUTPUT
+        
+        # Check if this is a workshop instance by checking expiration time (7 days or less)
+        expiration_days=$(
+          gh issue view $ISSUE_NUMBER \
+            --json labels \
+            --jq '[.labels[].name | select(. | startswith("expiration:")) | split(":")[1] | sub("d$"; "") | tonumber][0] // 999'
+        )
+        if (( $(echo "$expiration_days <= 7" | bc -l) )); then
+          is_workshop="true"
+        else
+          is_workshop="false"
+        fi
+        echo "is_workshop=$is_workshop" >> $GITHUB_OUTPUT
       env:
         GH_TOKEN: ${{ inputs.token }}
         GH_REPO: ${{ github.repository }}
@@ -676,8 +689,21 @@ runs:
 
     - name: Send mail
       id: send_email
-      if: ${{ steps.instance_poll.outputs.status == 'complete' }}
+      if: ${{ steps.instance_poll.outputs.status == 'complete' && steps.labels.outputs.is_workshop == 'false' }}
       uses: ./.github/actions/send-email
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
+        instance_name: ${{ steps.define.outputs.instance_name }}
+        instance_issue_number: ${{ inputs.issue_number }}
+
+    - name: Send workshop mail
+      id: send_workshop_email
+      if: ${{ steps.instance_poll.outputs.status == 'complete' && steps.labels.outputs.is_workshop == 'true' }}
+      uses: ./.github/actions/workshop-send-email
       with:
         os_cloud: ${{ inputs.os_cloud }}
         token: ${{ inputs.token }}

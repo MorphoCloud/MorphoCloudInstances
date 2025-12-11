@@ -24,7 +24,7 @@ jobs:
             "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
             github.event.issue.user.login }}"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name:
           Convenienty add "request:approved" label if comment added by an admin

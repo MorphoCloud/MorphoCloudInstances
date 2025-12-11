@@ -28,7 +28,7 @@ jobs:
             "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
             github.event.issue.user.login }}"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         if: ${{ steps.create_command.outputs.continue == 'true' }}
 
       - name: Check workflow management approval
@@ -85,7 +85,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
 
-      - uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+      - uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
         id: app-token
         with:
           app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}

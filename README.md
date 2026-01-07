@@ -16,7 +16,7 @@ In a nutshell, you:
 3. You have a github account;
 4. You have an ORCID with a public profile.
 
-**NOTE:** MorphoCloud and JetStream2 are designed for open science and public data; it is NOT compliant with high-security federal privacy regulations such as HIPAA or FERPA. Consequently, users are strictly prohibited from uploading, processing, or storing any data containing Personally Identifiable Information or Protected Health Information. 
+**NOTE:** MorphoCloud and JetStream2 are designed for open science and public data; it is NOT compliant with high-security federal privacy regulations such as HIPAA or FERPA. Consequently, users are strictly prohibited from uploading, processing, or storing any data containing Personally Identifiable Information or Protected Health Information. [See the detailed acceptable use policies here](https://docs.jetstream-cloud.org/general/policies/#acceptable-use-of-jetstream2)
 
 ## Available Instance Types
 
@@ -32,6 +32,19 @@ In a nutshell, you:
 
 [Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
 
+## Installed Software
+| Software/Tool | Description |
+|--------------|-------------|
+| 3D Slicer | v5.10 |
+| [SlicerMorph](https://github.com/SlicerMorph/SlicerMorph) | ImageStacks, GPA, ALPACA, and other tools |
+| [DeCA](https://github.com/SlicerMorph/SlicerDenseCorrespondenceAnalysis) | Morphometrics via dense correspondence analysis |
+| [Photogrammetry](https://github.com/SlicerMorph/SlicerPhotogrammetry) | Generate textured 3D models from photographs |
+| [MorphoDepot](https://github.com/MorphoCloud/SlicerMorphoDepot) | Collaborative segmentation and data sharing |
+| [MEMOs](https://github.com/SlicerMorph/SlicerMEMOS) | AI based organ segmentation for E15 mouse embryos |
+| [NNInteractive](https://github.com/coendevente/SlicerNNInteractive) | AI assisted interactive segmentation |
+| PyTorch | GPU accelerated tensor library for AI tools |
+| R/Rstudio | Provided by JetStream2 |
+| Python3 | Provided by JetStream2 |
 ## Ready to give a try?
 
 * **Individual users:** Go to https://github.com/MorphoCloud/MorphoCloudInstances/issues/new?template=instance-request.yml, fill in the necessary information and choose your instance flavor. Your request will be approved within 24h (often faster). Then, you can create and start using your instance. 

@@ -30,7 +30,7 @@ In a nutshell, you:
 
 \*`g3.l` is the default instance and is usually more available than other instance flavors.<br>
 
-[Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://docs.jetstream-cloud.org/overview/status/#availability-of-scarce-resources)
+[Click to see the approximate (delayed 5 minutes) count of available resources on JS2](https://grafana.jetstream-cloud.org/public-dashboards/b39f9f91452949389a4d333c3f451eac)
 
 ## Installed Software
 | Software/Tool | Description |

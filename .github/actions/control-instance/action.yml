@@ -334,13 +334,35 @@ runs:
 
         wait_interval=5    # Interval between status checks in seconds
         total_wait_time=0
+        capacity_error=false
 
         while [ $total_wait_time -lt $max_wait_time ]; do
 
-            status=$(openstack server show $INSTANCE_NAME -f json -c status | \
-              jq -r '.status // "PENDING"')
+            instance_json=$(openstack server show $INSTANCE_NAME -f json)
+            status=$(echo "$instance_json" | jq -r '.status // "PENDING"')
 
             echo -n "status [$status]. "
+
+            # Check for capacity error (only for unshelve command)
+            if [[ "$status" == "ERROR" && "$COMMAND_NAME" == "unshelve" ]]; then
+                host=$(echo "$instance_json" | jq -r '.["OS-EXT-SRV-ATTR:host"]')
+                host_id=$(echo "$instance_json" | jq -r '.hostId')
+                addresses=$(echo "$instance_json" | jq -r '.addresses')
+                
+                echo ""
+                echo "Detected ERROR status. Checking capacity error conditions..."
+                echo "host: $host"
+                echo "hostId: $host_id"
+                echo "addresses: $addresses"
+                
+                # host can be null, "null", or "None" - all indicate no host assigned
+                # addresses can be {} or "" when empty
+                if [[ ( "$host" == "null" || "$host" == "None" || "$host" == "" ) && "$host_id" == "" && ( "$addresses" == "{}" || "$addresses" == "" ) ]]; then
+                    echo "Capacity error detected - no instance available"
+                    capacity_error=true
+                    break
+                fi
+            fi
 
             if [[ "$status" == "$EXPECTED_STATUS" ]]; then
                 echo "Exiting loop."
@@ -358,13 +380,15 @@ runs:
         fi
 
         echo "status=$status" >> $GITHUB_OUTPUT
+        echo "capacity_error=$capacity_error" >> $GITHUB_OUTPUT
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
         EXPECTED_STATUS: ${{ steps.expected_status.outputs.value }}
+        COMMAND_NAME: ${{ inputs.command_name }}
 
     - name: comment (maximum wait time exceeded)
-      if: ${{ steps.instance_poll.outcome == 'failure' && failure() }}
+      if: ${{ steps.instance_poll.outcome == 'failure' && failure() && steps.instance_poll.outputs.capacity_error != 'true' }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
@@ -374,6 +398,68 @@ runs:
           Maximum wait time for command `${{ inputs.command_name }}` command to complete exceeded.
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Extract flavor on capacity error
+      if: ${{ steps.instance_poll.outputs.capacity_error == 'true' }}
+      id: extract_flavor
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+        
+        # Try to get flavor from instance
+        flavor=$(openstack server show "$INSTANCE_NAME" -f json | jq -r '.flavor' 2>/dev/null || echo "")
+        
+        # If not available from instance, try to get from issue labels
+        if [[ -z "$flavor" || "$flavor" == "null" ]]; then
+          flavor=$(
+            gh issue view $ISSUE_NUMBER \
+              --json labels \
+              --jq '[.labels[].name | select(. | startswith("flavor:")) | split(":")[1]][0]'
+          )
+        fi
+        
+        echo "flavor=$flavor" >> $GITHUB_OUTPUT
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+
+    - name: comment (no capacity available)
+      if: ${{ steps.instance_poll.outputs.capacity_error == 'true' }}
+      uses: peter-evans/create-or-update-comment@v4.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          No instance of type **${{ steps.extract_flavor.outputs.flavor }}** is available on JS2 at the moment.
+
+          See currently available resources at https://grafana.jetstream-cloud.org/public-dashboards/b39f9f91452949389a4d333c3f451eac
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Clean up failed instance (no capacity)
+      if: ${{ steps.instance_poll.outputs.capacity_error == 'true' }}
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+        
+        echo "Deleting failed instance due to capacity error"
+        openstack server delete "$INSTANCE_NAME" || echo "Failed to delete instance, it may not exist"
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: Exit on capacity error
+      if: ${{ steps.instance_poll.outputs.capacity_error == 'true' }}
+      shell: bash
+      run: |
+        echo "::error ::No capacity available for flavor $FLAVOR"
+        exit 1
+      env:
+        FLAVOR: ${{ steps.extract_flavor.outputs.flavor }}
 
     - name: Disassociate floating IP from shelved instance
       if:

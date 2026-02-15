@@ -81,8 +81,45 @@ jobs:
           operation: "decode"
           skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
 
-      - name: Send renewal email
-        id: send_email
+      - name: Check renewal availability
+        id: check_renewal
+        shell: bash
+        run: |
+          # Retrieve issue labels
+          issue_json=$(gh issue view "$ISSUE_NUMBER" --json labels)
+          labels=$(echo "$issue_json" | jq -r '.labels[].name')
+
+          # Extract expiration labels (e.g., expiration:60d, expiration:120d)
+          lifespan_list=$(echo "$labels" | grep -oP '(?<=expiration:)\d+(\.\d+)?' | sort -n)
+
+          # Count available expiration labels
+          expiration_count=$(echo "$lifespan_list" | wc -l)
+
+          # Retrieve the highest existing renewal count (e.g., renewed:1, renewed:2)
+          renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1)
+          renewed_count=${renewed_count:-0}  # Default to 0 if not found
+
+          echo "Expiration count: $expiration_count"
+          echo "Renewed count: $renewed_count"
+
+          # Check if renewal is still available
+          # Renewal is available if renewed_count + 1 < expiration_count
+          if [[ $((renewed_count + 1)) -lt $expiration_count ]]; then
+            renewal_available="true"
+          else
+            renewal_available="false"
+          fi
+
+          echo "Renewal available: $renewal_available"
+          echo "renewal_available=$renewal_available" >> $GITHUB_OUTPUT
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Send renewal email (renewal available)
+        id: send_email_renewable
+        if: ${{ steps.check_renewal.outputs.renewal_available == 'true' }}
         uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
         with:
           server_address: smtp.gmail.com
@@ -118,8 +155,48 @@ jobs:
 
             **⏳ Time is running out! If you wish to keep your instance and volume, comment `/renew` now!**
 
+      - name: Send final expiration email (no renewal available)
+        id: send_email_final
+        if: ${{ steps.check_renewal.outputs.renewal_available == 'false' }}
+        uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: MorphoCloudPortal
+          to: ${{ steps.decode_email.outputs.output_string }}
+          subject:
+            "[${{ github.event.repository.name }}] FINAL NOTICE: Instance ${{
+            steps.define.outputs.instance_name }} and Volume ${{
+            steps.define_volume_name.outputs.volume_name }} Will Be Deleted"
+          convert_markdown: true
+          html_body: |
+            ## 🚨 FINAL NOTICE: Your MorphoCloud Instance & Volume Will Be Permanently Deleted in ${{ inputs.days_until_expiration }} Days
+
+            Your MorphoCloud instance **${{ steps.define.outputs.instance_name }}** and its associated volume **${{ steps.define_volume_name.outputs.volume_name }}** are scheduled for **permanent deletion** in **${{ inputs.days_until_expiration }}** days.
+
+            **⚠️ IMPORTANT: This instance has already been renewed and NO FURTHER RENEWALS ARE POSSIBLE.**
+
+            **This action is irreversible.** Please ensure you:
+            1. **Back up all important data immediately** from your instance and volume
+            2. Download any files or results you need to keep
+
+            **🔴 Your instance and volume will be permanently deleted in ${{ inputs.days_until_expiration }} days. There is no way to extend this deadline.**
+
+            ## 🆕 Need a New Instance?
+
+            After your current instance is deleted, you can request a new instance by opening a new issue in this repository.
+
+            ## ❓ Need Help?
+
+            Contact us at [morphocloud@outlook.com](mailto:morphocloud@outlook.com) if you have any questions.
+
+            **⏳ Time is running out! Back up your data now!**
+
       - name: command results comment (failed)
-        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
+        if: ${{ (steps.send_email_renewable.outcome == 'failure' || steps.send_email_final.outcome == 'failure') && failure() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ inputs.issue_number }}
@@ -129,9 +206,9 @@ jobs:
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: command results comment (success)
-        if: ${{ steps.send_email.outcome == 'success' && success() }}
+        if: ${{ (steps.send_email_renewable.outcome == 'success' || steps.send_email_final.outcome == 'success') && success() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ inputs.issue_number }}
           body: |
-            ✅ Successfully sent renewal email for **${{ steps.define.outputs.instance_name }}**.
+            ✅ Successfully sent ${{ steps.check_renewal.outputs.renewal_available == 'true' && 'renewal' || 'final expiration' }} email for **${{ steps.define.outputs.instance_name }}**.

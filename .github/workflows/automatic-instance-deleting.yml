@@ -18,6 +18,8 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
+        with:
+          clean: true
 
       - uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
         id: app-token
@@ -67,7 +69,8 @@ jobs:
               # Compute expiration time
               expiration_days=$(echo "$lifespan_list" | sed -n "$((renewed_count + 1))p")
               expiration_days=${expiration_days:-0}
-              expiration_time_epoch=$((created_at_epoch + expiration_days * 86400))
+              # Use bc for floating-point arithmetic support
+              expiration_time_epoch=$(printf "%.0f" $(echo "$created_at_epoch + $expiration_days * 86400" | bc))
 
               # Calculate time remaining in seconds (not days) for accurate comparison
               seconds_until_expiration=$((expiration_time_epoch - current_time_epoch))
@@ -81,7 +84,8 @@ jobs:
 
                 # For workshop instances (expiration <= 7 days), delete volume first inline, then instance
                 # For regular instances, delete instance and add volume:expiration-pending label for grace period
-                if [[ "$expiration_days" -le 7 ]]; then
+                # Use bc for floating-point comparison
+                if (( $(echo "$expiration_days <= 7" | bc -l) )); then
                   echo "Workshop instance detected. Deleting volume inline..."
 
                   # Workshop volumes have no suffix (just "My-Data-NNN")
@@ -145,14 +149,15 @@ jobs:
                 fi
 
                 # For regular instances (expiration > 7 days), add volume:expiration-pending label for grace period
-                if [[ "$expiration_days" -gt 7 ]]; then
+                if (( $(echo "$expiration_days > 7" | bc -l) )); then
                   gh issue edit $issue_number --add-label "volume:expiration-pending"
                 fi
 
               elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
                 # Skip renewal emails for workshop instances (expiration <= 7 days)
                 # Workshop instances are temporary and not meant to be renewed
-                if [[ "$expiration_days" -le 7 ]]; then
+                # Use bc for floating-point comparison
+                if (( $(echo "$expiration_days <= 7" | bc -l) )); then
                   echo "Skipping renewal email for workshop instance ${instance_name} (expires in ${expiration_days} days)"
                 else
                   echo "Instance ${instance_name} will expire soon. Sending warning..."

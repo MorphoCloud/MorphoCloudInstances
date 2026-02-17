@@ -82,55 +82,53 @@ jobs:
               if [[ "$seconds_until_expiration" -le 0 ]]; then
                 echo "Instance ${instance_name} has expired. Deleting..."
 
-                # For workshop instances (expiration <= 7 days), delete volume first inline, then instance
-                # For regular instances, delete instance and add volume:expiration-pending label for grace period
-                # Use bc for floating-point comparison
-                if (( $(echo "$expiration_days <= 7" | bc -l) )); then
-                  echo "Workshop instance detected. Deleting volume inline..."
+                # Delete volume first inline, then instance (no grace period)
+                # Volume name uses optional suffix from VOLUME_NAME_SUFFIX variable
+                volume_suffix=${SUFFIX:+-${SUFFIX}}
+                volume_name="My-Data-${issue_number}${volume_suffix}"
+                echo "Volume name: $volume_name"
 
-                  # Workshop volumes have no suffix (just "My-Data-NNN")
-                  volume_name="My-Data-${issue_number}"
-                  echo "Volume name: $volume_name"
+                # Check if volume exists
+                volume_id=$(openstack volume list -f json | \
+                  jq --arg volume_name "$volume_name" \
+                  -r '.[] | select(.Name == $volume_name) | .ID' | tail -1)
 
-                  # Check if volume exists
-                  volume_id=$(openstack volume list -f json | \
-                    jq --arg volume_name "$volume_name" \
-                    -r '.[] | select(.Name == $volume_name) | .ID' | tail -1)
+                if [[ -n "$volume_id" ]]; then
+                  echo "Found volume: $volume_id"
 
-                  if [[ -n "$volume_id" ]]; then
-                    echo "Found volume: $volume_id"
+                  # Check if volume is attached to instance
+                  instance_id=$(openstack server list -f json | \
+                    jq --arg instance_name "$instance_name" \
+                    -r '.[] | select(.Name == $instance_name) | .ID' | tail -1)
 
-                    # Check if volume is attached to instance
-                    instance_id=$(openstack server list -f json | \
-                      jq --arg instance_name "$instance_name" \
-                      -r '.[] | select(.Name == $instance_name) | .ID' | tail -1)
+                  if [[ -n "$instance_id" ]]; then
+                    is_attached=$(openstack server show "$instance_id" -f json | \
+                      jq --arg volume_id "$volume_id" \
+                      '[.volumes_attached[]?.id] | index($volume_id) != null')
 
-                    if [[ -n "$instance_id" ]]; then
-                      is_attached=$(openstack server show "$instance_id" -f json | \
-                        jq --arg volume_id "$volume_id" \
-                        '[.volumes_attached[]?.id] | index($volume_id) != null')
-
-                      if [[ "$is_attached" == "true" ]]; then
-                        echo "Detaching volume from instance..."
-                        if ! openstack server remove volume "$instance_id" "$volume_id"; then
-                          echo "::warning ::Failed to detach volume $volume_name from $instance_name"
-                        fi
+                    if [[ "$is_attached" == "true" ]]; then
+                      echo "Detaching volume from instance..."
+                      if openstack server remove volume "$instance_id" "$volume_id"; then
+                        echo "Waiting 60 seconds for volume to become available..."
+                        sleep 60
+                      else
+                        echo "::warning ::Failed to detach volume $volume_name from $instance_name"
                       fi
                     fi
-
-                    # Delete the volume
-                    echo "Deleting volume..."
-                    if openstack volume delete "$volume_id"; then
-                      echo "Volume $volume_name deleted successfully"
-                      gh issue edit "$issue_number" --add-label "volume:deleted" --remove-label "volume:expiration-pending" || true
-                      gh issue comment "$issue_number" --body "Volume **${volume_name}** successfully deleted ✅"
-                    else
-                      echo "::warning ::Failed to delete volume $volume_name"
-                      gh issue comment "$issue_number" --body "❌ Failed to delete volume **${volume_name}**. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    fi
-                  else
-                    echo "Volume $volume_name does not exist, skipping volume deletion"
                   fi
+
+                  # Delete the volume
+                  echo "Deleting volume..."
+                  if openstack volume delete "$volume_id"; then
+                    echo "Volume $volume_name deleted successfully"
+                    gh issue edit "$issue_number" --add-label "volume:deleted" --remove-label "volume:expiration-pending" || true
+                    gh issue comment "$issue_number" --body "Volume **${volume_name}** successfully deleted ✅"
+                  else
+                    echo "::warning ::Failed to delete volume $volume_name"
+                    gh issue comment "$issue_number" --body "❌ Failed to delete volume **${volume_name}**. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  fi
+                else
+                  echo "Volume $volume_name does not exist, skipping volume deletion"
                 fi
 
                 # Delete instance
@@ -146,11 +144,6 @@ jobs:
                   gh issue comment "$issue_number" \
                     --body "❌ Failed to delete instance. See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                   continue
-                fi
-
-                # For regular instances (expiration > 7 days), add volume:expiration-pending label for grace period
-                if (( $(echo "$expiration_days > 7" | bc -l) )); then
-                  gh issue edit $issue_number --add-label "volume:expiration-pending"
                 fi
 
               elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
@@ -186,4 +179,5 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}
+          SUFFIX: ${{ vars.VOLUME_NAME_SUFFIX }}
           EXPIRATION_WARNING_DAYS: 7

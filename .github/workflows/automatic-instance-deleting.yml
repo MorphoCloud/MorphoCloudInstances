@@ -63,7 +63,7 @@ jobs:
             # Skip if issue is not associated with any "expiration" labels.
             if [[ -n "$lifespan_list" ]]; then
               # Retrieve renewal values from labels.
-              renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1)
+              renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1 || true)
               renewed_count=${renewed_count:-0}  # Default to 0 if not found
 
               # Compute expiration time

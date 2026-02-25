@@ -96,7 +96,7 @@ jobs:
           expiration_count=$(echo "$lifespan_list" | wc -l)
 
           # Retrieve the highest existing renewal count (e.g., renewed:1, renewed:2)
-          renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1)
+          renewed_count=$(echo "$labels" | grep -oP '(?<=renewed:)\d+' | sort -nr | head -n1 || true)
           renewed_count=${renewed_count:-0}  # Default to 0 if not found
 
           echo "Expiration count: $expiration_count"

@@ -104,26 +104,23 @@ jobs:
               #   Reference: https://stackoverflow.com/questions/9393038/ssh-breaks-out-of-while-loop-in-bash
 
               # Retrieve the instance uptime using SSH
-              uptime=$(ssh \
+              if ! uptime=$(ssh \
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o LogLevel=ERROR \
                 exouser@$instance_ip \
-                  'cat /proc/uptime | awk  "{print \$1}"' < /dev/null)
-
-              if [[ $? -ne 0 ]]; then
+                  'cat /proc/uptime | awk  "{print \$1}"' < /dev/null); then
                 echo "::warning ::Failed to retrieve uptime for $instance_name using IP $instance_ip"
                 continue
               fi
 
               # Retrieve the startup time of the instance in yyyy-mm-dd HH:MM:SS format
-              startup_time=$(ssh \
+              if ! startup_time=$(ssh \
                 -o StrictHostKeyChecking=no \
                 -o UserKnownHostsFile=/dev/null \
                 -o LogLevel=ERROR \
                 exouser@$instance_ip \
-                  'uptime -s' < /dev/null)
-              if [[ $? -ne 0 ]]; then
+                  'uptime -s' < /dev/null); then
                 echo "::warning ::Failed to retrieve startup time for $instance_name using IP $instance_ip"
                 continue
               fi

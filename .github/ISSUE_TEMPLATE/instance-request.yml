@@ -51,6 +51,7 @@ body:
       description:
         Enter the email address that should receive notifications about the
         instance. Ensure this is a valid, regularly checked email.
+      placeholder: name@example.com
     validations:
       required: true
 

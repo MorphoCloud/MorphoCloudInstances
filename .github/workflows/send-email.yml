@@ -55,31 +55,9 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Determine if workshop child issue
-        id: check_workshop
-        shell: bash
-        run: |
-          is_workshop=${{ contains(github.event.issue.labels.*.name, 'request:approved') }}
-          echo "is_workshop=$is_workshop" >> $GITHUB_OUTPUT
-
-      - name: Send mail (individual)
+      - name: Send mail
         id: send_email
-        if: ${{ steps.check_workshop.outputs.is_workshop != 'true' }}
         uses: ./.github/actions/send-email
-        with:
-          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          email_lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
-          issue_creator: ${{ github.event.issue.user.login }}
-          mail_server_username: ${{ secrets.MAIL_USERNAME }}
-          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
-          instance_name: ${{ steps.define.outputs.instance_name }}
-          instance_issue_number: ${{ github.event.issue.number }}
-
-      - name: Send mail (workshop)
-        id: send_workshop_email
-        if: ${{ steps.check_workshop.outputs.is_workshop == 'true' }}
-        uses: ./.github/actions/workshop-send-email
         with:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -90,19 +68,19 @@ jobs:
           instance_issue_number: ${{ github.event.issue.number }}
 
       - name: command results comment (failed)
-        if: ${{ (steps.send_email.outcome == 'failure' || steps.send_workshop_email.outcome == 'failure') && failure() }}
+        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
             ### Command Results ❌
 
-            `email` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance. ${{ steps.send_email.outputs.error_message }}${{ steps.send_workshop_email.outputs.error_message }}
+            `email` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance. ${{ steps.send_email.outputs.error_message }}
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: command results comment (success)
-        if: ${{ (steps.send_email.outcome == 'success' || steps.send_workshop_email.outcome == 'success') && success() }}
+        if: ${{ steps.send_email.outcome == 'success' && success() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}

@@ -196,7 +196,7 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal <morphocloudportal@gmail.com>
+          from: MorphoCloudPortal
           to: ${{ steps.decode_email.outputs.output_string }}
           subject:
             "[${{ github.event.repository.name }}] Workshop #${{

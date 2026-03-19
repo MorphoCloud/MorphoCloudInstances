@@ -33,12 +33,16 @@ jobs:
           SUPPORTED_COMMANDS=(
             "/shelve"
             "/unshelve"
+            "/encode_email"
+            "/decode_email"
             "/email"
             "/renew"
             "/create"
             "/delete_instance"
             "/delete_volume"
             "/delete_all"
+            "/approve"
+            "/unapprove"
           )
 
           if printf '%s\n' "${SUPPORTED_COMMANDS[@]}" | grep -Fxq "$TRIMMED_COMMAND"; then

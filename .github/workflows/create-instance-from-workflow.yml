@@ -47,22 +47,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
-        id: app-token
-        with:
-          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
-          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
-
-      - name: Get issue creator
-        id: issue_meta
-        run: |
-          AUTHOR=$(gh issue view "$ISSUE_NUMBER" --json author --jq '.author.login')
-          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
       - name: Create instance
         uses: ./.github/actions/create-instance
         with:
@@ -71,11 +55,6 @@ jobs:
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           volume_name_suffix: ${{ vars.VOLUME_NAME_PREFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          app_token: ${{ steps.app-token.outputs.token }}
-          org: MorphoCloud
-          users_team_slug: MorphoCloudUsers
-          issue_creator: ${{ steps.issue_meta.outputs.author }}
-          email_lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
           string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}

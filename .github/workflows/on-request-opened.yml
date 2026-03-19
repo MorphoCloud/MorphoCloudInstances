@@ -10,78 +10,16 @@ permissions:
   checks: read
 
 jobs:
-  check-instance-team-membership:
-    runs-on: ubuntu-latest
-    if:
-      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
-      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/create-github-app-token@v2.2.0
-        id: app-token
-        with:
-          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
-          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
-
-      - name: Check MorphoCloudUsers team membership
-        id: check_membership
-        uses: ./.github/actions/check-team-membership
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          org: ${{ github.repository_owner }}
-          team_slug: ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}
-          username: ${{ github.event.issue.user.login }}
-
-      - name: Reject non-member
-        if: ${{ steps.check_membership.outputs.is_member != 'true' }}
-        run: |
-          gh issue comment "$ISSUE_NUMBER" --body "### Authorization Failed ❌
-
-          @$ISSUE_CREATOR is not a member of the **$TEAM_SLUG** team.
-
-          To request an instance, please complete the [MorphoCloud intake form](https://forms.gle/morphocloud-intake) first and accept the GitHub organization invitation.
-
-          This issue will be closed."
-
-          gh issue close "$ISSUE_NUMBER"
-          gh issue edit "$ISSUE_NUMBER" --add-label "error:not-authorized"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
-          TEAM_SLUG: ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}
-
-      - name: Fail if not authorized
-        if: ${{ steps.check_membership.outputs.is_member != 'true' }}
-        run: |
-          echo "::error ::User ${{ github.event.issue.user.login }} is not a member of ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}"
-          exit 1
-
   call-validate-request:
-    needs: [check-instance-team-membership]
+    # This applies to both "request-type:instance" and "request-type:workshop"
     if:
-      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
-      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
-    uses: ./.github/workflows/validate-request.yml
-    with:
-      issue_number: "${{ github.event.issue.number }}"
-    secrets: inherit
-
-  call-validate-request-workshop:
-    # Validation for workshop requests (no team membership gate needed here;
-    # approval is required later)
-    if:
-      ${{ contains(github.event.issue.labels.*.name, 'request-type:workshop') &&
-      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+      ${{ contains(github.event.issue.labels.*.name, 'request-creator:user') }}
     uses: ./.github/workflows/validate-request.yml
     with:
       issue_number: "${{ github.event.issue.number }}"
     secrets: inherit
 
   call-request-labeler:
-    needs: [check-instance-team-membership]
     if:
       ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
       contains(github.event.issue.labels.*.name, 'request-creator:user') }}
@@ -91,7 +29,6 @@ jobs:
     secrets: inherit
 
   call-request-initial-comments:
-    needs: [check-instance-team-membership]
     if:
       ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
       contains(github.event.issue.labels.*.name, 'request-creator:user') }}
@@ -100,4 +37,11 @@ jobs:
       issue_number: "${{ github.event.issue.number }}"
     secrets: inherit
 
-
+  call-request-notify-admin:
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-notify-admin.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit

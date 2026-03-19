@@ -18,9 +18,37 @@ inputs:
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
+  # --- Individual instance path (team membership + email lookup) ---
+  app_token:
+    description:
+      "GitHub App token with read:org scope for team membership check
+      (individual path)"
+    required: false
+    default: ""
+  org:
+    description: "GitHub organization name (individual path)"
+    required: false
+    default: ""
+  users_team_slug:
+    description: "Team slug for MorphoCloudUsers (individual path)"
+    required: false
+    default: ""
+  issue_creator:
+    description: "GitHub username of the issue creator (individual path)"
+    required: false
+    default: ""
+  email_lookup_url:
+    description:
+      "URL of the Apps Script web app for email lookup (individual path)"
+    required: false
+    default: ""
+  # --- Workshop path (approval label + email from issue body) ---
   string_encryption_key:
-    description: "Encryption key to encode and decode the email address"
-    required: true
+    description:
+      "Encryption key to encode and decode the email address (workshop path)"
+    required: false
+    default: ""
+  # --- Common ---
   mail_server_username:
     description: "mail server username"
     required: true
@@ -37,31 +65,87 @@ runs:
         prefix: ${{ inputs.instance_name_prefix }}
         issue_number: ${{ inputs.issue_number }}
 
-    - name: Check instance management approval
-      id: check_approval
-      uses: ./.github/actions/check-approval
-      with:
-        token: ${{ inputs.token }}
-        issue_number: ${{ inputs.issue_number }}
+    - name: Check authorization
+      id: check_auth
+      shell: bash
+      run: |
+        authorized="false"
 
-    - name: command results comment (Instance management not approved)
-      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+        # Individual path: check team membership
+        if [[ -n "$APP_TOKEN" && -n "$ORG" && -n "$USERS_TEAM_SLUG" && -n "$ISSUE_CREATOR" ]]; then
+          echo "Checking team membership for '$ISSUE_CREATOR' in '$ORG/teams/$USERS_TEAM_SLUG'"
+          HTTP_CODE=$(curl -s -o /tmp/membership_response.json -w "%{http_code}" \
+            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/orgs/$ORG/teams/$USERS_TEAM_SLUG/memberships/$ISSUE_CREATOR")
+
+          if [[ "$HTTP_CODE" == "200" ]]; then
+            STATE=$(jq -r '.state' /tmp/membership_response.json)
+            if [[ "$STATE" == "active" ]]; then
+              authorized="true"
+              echo "User '$ISSUE_CREATOR' is an active member of '$ORG/teams/$USERS_TEAM_SLUG'"
+            fi
+          fi
+          rm -f /tmp/membership_response.json
+        fi
+
+        # Workshop path: check request:approved label
+        if [[ "$authorized" == "false" ]]; then
+          LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels 2>/dev/null)
+          is_approved=$(echo "$LABELS_JSON" | jq -e '[.labels[].name] | index("request:approved")' > /dev/null && echo "true" || echo "false")
+          if [[ "$is_approved" == "true" ]]; then
+            authorized="true"
+            echo "Issue #$ISSUE_NUMBER has request:approved label"
+          fi
+        fi
+
+        echo "authorized=$authorized" >> $GITHUB_OUTPUT
+      env:
+        APP_TOKEN: ${{ inputs.app_token }}
+        ORG: ${{ inputs.org }}
+        USERS_TEAM_SLUG: ${{ inputs.users_team_slug }}
+        ISSUE_CREATOR: ${{ inputs.issue_creator }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+
+    - name: command results comment (Not authorized)
+      if: ${{ steps.check_auth.outputs.authorized != 'true' }}
       uses: peter-evans/create-or-update-comment@v5.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
         body: |
           ### Command Results ❌
 
-          `/create` command failed because management of **${{ steps.define.outputs.instance_name }}** has not been approved yet.
+          `/create` command failed because the request for **${{ steps.define.outputs.instance_name }}** has not been authorized.
 
-    - name: instance management not approved (failure)
-      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+    - name: not authorized (failure)
+      if: ${{ steps.check_auth.outputs.authorized != 'true' }}
       shell: bash
       run: |
-        echo "::error ::Instance $INSTANCE_NAME management not approved"
+        echo "::error ::Instance $INSTANCE_NAME creation not authorized"
         exit 1
       env:
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: Add request:approved label and remove stale labels
+      if: ${{ steps.check_auth.outputs.authorized == 'true' }}
+      shell: bash
+      run: |
+        gh issue edit "$ISSUE_NUMBER" --add-label "request:approved"
+
+        # Remove stale volume:* and status:* labels left from a previous delete cycle
+        stale_labels=$(gh issue view "$ISSUE_NUMBER" --json labels \
+          --jq '[.labels[].name | select(test("^(volume:|status:)"))] | join(",")')
+        if [[ -n "$stale_labels" ]]; then
+          echo "Removing stale labels: $stale_labels"
+          gh issue edit "$ISSUE_NUMBER" --remove-label "$stale_labels"
+        fi
+      env:
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
 
     - name: comment (progress)
       id: couc_progress
@@ -805,7 +889,8 @@ runs:
       with:
         os_cloud: ${{ inputs.os_cloud }}
         token: ${{ inputs.token }}
-        string_encryption_key: ${{ inputs.string_encryption_key }}
+        email_lookup_url: ${{ inputs.email_lookup_url }}
+        issue_creator: ${{ inputs.issue_creator }}
         mail_server_username: ${{ inputs.mail_server_username }}
         mail_server_password: ${{ inputs.mail_server_password }}
         instance_name: ${{ steps.define.outputs.instance_name }}

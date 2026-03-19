@@ -9,8 +9,11 @@ inputs:
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
-  string_encryption_key:
-    description: "Encryption key to encode and decode the email address"
+  email_lookup_url:
+    description: "URL of the Apps Script web app for email lookup"
+    required: true
+  issue_creator:
+    description: "GitHub username of the issue creator"
     required: true
   mail_server_username:
     description: "mail server username"
@@ -31,13 +34,12 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Extract fields
-      id: extract
-      uses: ./.github/actions/extract-issue-fields
+    - name: Look up email via Apps Script
+      id: lookup_email
+      uses: ./.github/actions/lookup-email
       with:
-        token: ${{ inputs.token }}
-        repository: ${{ github.repository }}
-        issue_number: ${{ inputs.instance_issue_number }}
+        lookup_url: ${{ inputs.email_lookup_url }}
+        github_username: ${{ inputs.issue_creator }}
 
     - name: Retrieve metadata
       id: instance_metadata
@@ -52,28 +54,6 @@ runs:
       with:
         instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
 
-    - name: Check if email is encoded
-      id: check_email_encryption
-      shell: bash
-      run: |
-        if [[ "$EMAIL" != *"@"* ]]; then
-          encoded="true"
-        else
-          encoded="false"
-        fi
-        echo "encoded=$encoded" >> $GITHUB_OUTPUT
-      env:
-        EMAIL: ${{ steps.extract.outputs.email }}
-
-    - name: Decode email
-      id: decode_email
-      uses: ./.github/actions/encode-decode-string
-      with:
-        input_string: ${{ steps.extract.outputs.email }}
-        encryption_key: ${{ inputs.string_encryption_key }}
-        operation: "decode"
-        skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
-
     - name: Send mail
       uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
       with:
@@ -82,8 +62,8 @@ runs:
         secure: true
         username: ${{ inputs.mail_server_username }}
         password: ${{ inputs.mail_server_password }}
-        from: MorphoCloudPortal
-        to: ${{ steps.decode_email.outputs.output_string }}
+        from: MorphoCloudPortal <morphocloudportal@gmail.com>
+        to: ${{ steps.lookup_email.outputs.email }}
         subject:
           "[${{ github.event.repository.name }}] Instance ${{
           inputs.instance_name }} active"
@@ -132,8 +112,6 @@ runs:
           - `/create`: Create **${{ inputs.instance_name }}**
           - `/shelve`: Shelve **${{ inputs.instance_name }}**
           - `/unshelve`: Unshelve **${{ inputs.instance_name }}**
-          - `/encode_email`: Update issue description obfuscating emails
-          - `/decode_email`: Update issue description deobfuscating emails
           - `/email`: Send this email with connection URL
           - `/renew`: Extend the instance lifespan if additional time is available.
           - `/delete_instance`: Delete **${{ inputs.instance_name }}**

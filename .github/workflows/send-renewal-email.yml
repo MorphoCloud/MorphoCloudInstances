@@ -51,16 +51,42 @@ jobs:
           issue_number: ${{ inputs.issue_number }}
           suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
 
-      - name: Extract fields
+      - name: Get issue metadata
+        id: issue_meta
+        shell: bash
+        run: |
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels,author)
+          AUTHOR=$(echo "$ISSUE_JSON" | jq -r '.author.login')
+          IS_WORKSHOP=$(echo "$ISSUE_JSON" | jq -e '[.labels[].name] | index("request-type:workshop")' > /dev/null 2>&1 && echo "true" || echo "false")
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "is_workshop=$IS_WORKSHOP" >> $GITHUB_OUTPUT
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      # --- Individual path: look up email from Apps Script ---
+      - name: Look up email (individual)
+        id: lookup_email
+        if: ${{ steps.issue_meta.outputs.is_workshop != 'true' }}
+        uses: ./.github/actions/lookup-email
+        with:
+          lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
+          username: ${{ steps.issue_meta.outputs.author }}
+
+      # --- Workshop path: extract email from issue body ---
+      - name: Extract fields (workshop)
         id: extract
+        if: ${{ steps.issue_meta.outputs.is_workshop == 'true' }}
         uses: ./.github/actions/extract-issue-fields
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           issue_number: ${{ inputs.issue_number }}
 
-      - name: Check if email is encoded
+      - name: Check if email is encoded (workshop)
         id: check_email_encryption
+        if: ${{ steps.issue_meta.outputs.is_workshop == 'true' }}
         shell: bash
         run: |
           if [[ "$EMAIL" != *"@"* ]]; then
@@ -72,14 +98,29 @@ jobs:
         env:
           EMAIL: ${{ steps.extract.outputs.email }}
 
-      - name: Decode email
+      - name: Decode email (workshop)
         id: decode_email
+        if: ${{ steps.issue_meta.outputs.is_workshop == 'true' }}
         uses: ./.github/actions/encode-decode-string
         with:
           input_string: ${{ steps.extract.outputs.email }}
           encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
           operation: "decode"
           skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+      - name: Resolve email
+        id: resolve_email
+        shell: bash
+        run: |
+          if [[ "$IS_WORKSHOP" == "true" ]]; then
+            echo "email=$WORKSHOP_EMAIL" >> $GITHUB_OUTPUT
+          else
+            echo "email=$INDIVIDUAL_EMAIL" >> $GITHUB_OUTPUT
+          fi
+        env:
+          IS_WORKSHOP: ${{ steps.issue_meta.outputs.is_workshop }}
+          WORKSHOP_EMAIL: ${{ steps.decode_email.outputs.output_string }}
+          INDIVIDUAL_EMAIL: ${{ steps.lookup_email.outputs.email }}
 
       - name: Check renewal availability
         id: check_renewal
@@ -127,8 +168,8 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal
-          to: ${{ steps.decode_email.outputs.output_string }}
+          from: MorphoCloudPortal <morphocloudportal@gmail.com>
+          to: ${{ steps.resolve_email.outputs.email }}
           subject:
             "[${{ github.event.repository.name }}] Instance ${{
             steps.define.outputs.instance_name }} and Volume ${{
@@ -165,8 +206,8 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal
-          to: ${{ steps.decode_email.outputs.output_string }}
+          from: MorphoCloudPortal <morphocloudportal@gmail.com>
+          to: ${{ steps.resolve_email.outputs.email }}
           subject:
             "[${{ github.event.repository.name }}] FINAL NOTICE: Instance ${{
             steps.define.outputs.instance_name }} and Volume ${{

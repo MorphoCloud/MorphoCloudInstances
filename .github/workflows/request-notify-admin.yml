@@ -56,7 +56,7 @@ jobs:
           secure: true
           username: ${{secrets.MAIL_USERNAME}}
           password: ${{secrets.MAIL_PASSWORD}}
-          from: ${{ github.event.repository.name }}
+          from: MorphoCloudPortal <morphocloudportal@gmail.com>
           to: ${{ vars.MORPHOCLOUD_GITHUB_ADMIN_EMAILS }}
           subject:
             "[${{ github.event.repository.name }}] Approval requested for

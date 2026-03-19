@@ -20,6 +20,7 @@ on:
 permissions:
   issues: write
   checks: read
+  contents: read
 
 jobs:
   validate:
@@ -48,6 +49,17 @@ jobs:
 
       - uses: actions/checkout@v6
 
+      - name: Determine request type
+        id: request_type
+        run: |
+          LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels)
+          is_workshop=$(echo "$LABELS_JSON" | jq -e '[.labels[].name] | index("request-type:workshop")' > /dev/null 2>&1 && echo "true" || echo "false")
+          echo "is_workshop=$is_workshop" >> $GITHUB_OUTPUT
+        env:
+          ISSUE_NUMBER: ${{ steps.collect_inputs.outputs.issue_number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
       - name: Extract fields
         id: extract
         uses: ./.github/actions/extract-issue-fields
@@ -56,8 +68,11 @@ jobs:
           repository: ${{ github.repository }}
           issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
 
+      # --- Workshop-only validation (ORCID, Email, Confirm Email) ---
+
       - name: Check ORCID iD format
         id: check_orcid_format
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         run: |
           if [[ "$ORCID" =~ ^([0-9]{4}-){3}[0-9]{3}([0-9]|X)$ ]]; then
             valid="true"
@@ -73,6 +88,7 @@ jobs:
 
       - name: Check if email is encoded
         id: check_email_encryption
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         run: |
           if [[ "$EMAIL" != *"@"* ]]; then
             encoded="true"
@@ -85,6 +101,7 @@ jobs:
 
       - name: Decode email
         id: decode_email
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         uses: ./.github/actions/encode-decode-string
         with:
           input_string: ${{ steps.extract.outputs.email }}
@@ -94,6 +111,7 @@ jobs:
 
       - name: Check email format
         id: check_email_format
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         run: |
           # Adapted from https://gist.github.com/guessi/82a73ee7eb2b1216eb9db17bb8d65dd1
           email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
@@ -111,6 +129,7 @@ jobs:
 
       - name: Check if confirm email is encoded
         id: check_confirm_email_encryption
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         run: |
           if [[ "$CONFIRM_EMAIL" != *"@"* ]]; then
             encoded="true"
@@ -123,6 +142,7 @@ jobs:
 
       - name: Decode confirm email
         id: decode_confirm_email
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         uses: ./.github/actions/encode-decode-string
         with:
           input_string: ${{ steps.extract.outputs.confirm_email }}
@@ -134,6 +154,7 @@ jobs:
 
       - name: Check confirm email format
         id: check_confirm_email_format
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         run: |
           # Adapted from https://gist.github.com/guessi/82a73ee7eb2b1216eb9db17bb8d65dd1
           email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
@@ -151,6 +172,7 @@ jobs:
 
       - name: Check emails match
         id: check_emails_match
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         run: |
           if [[ "$EMAIL" == "$CONFIRM_EMAIL" ]]; then
             valid="true"
@@ -167,6 +189,7 @@ jobs:
 
       - uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
         id: app-token
+        if: ${{ steps.request_type.outputs.is_workshop == 'true' }}
         with:
           app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
           private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
@@ -174,8 +197,9 @@ jobs:
       - name: Encode emails
         id: encode_emails
         if:
-          ${{ success() && steps.check_email_encryption.outputs.encoded ==
-          'false' && steps.check_email_format.outputs.valid == 'true' &&
+          ${{ steps.request_type.outputs.is_workshop == 'true' && success() &&
+          steps.check_email_encryption.outputs.encoded == 'false' &&
+          steps.check_email_format.outputs.valid == 'true' &&
           steps.check_confirm_email_format.outputs.valid == 'true' &&
           steps.check_emails_match.outputs.valid == 'true' }}
         run: |
@@ -187,12 +211,26 @@ jobs:
           COMMAND_NAME: encode_email
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
+      # --- Validation result comments ---
+
       - name: find command results comment
         uses: peter-evans/find-comment@v4
         id: fc
         with:
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body-includes: "### Validation Results"
+
+      - name: command results comment (instance - success)
+        if: ${{ steps.request_type.outputs.is_workshop != 'true' && success() }}
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          edit-mode: replace
+          body: |
+            ### Validation Results
+
+            ✅ Instance request validated. You may now use `/create` to provision your instance.
 
       - name: command results comment (failure)
         if: ${{ failure() }}
@@ -208,9 +246,10 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: command results comment (status)
+      - name: command results comment (workshop - all valid)
         if:
-          ${{ success() && (steps.check_orcid_format.outputs.valid == 'true' &&
+          ${{ steps.request_type.outputs.is_workshop == 'true' && success() &&
+          (steps.check_orcid_format.outputs.valid == 'true' &&
           steps.check_email_format.outputs.valid == 'true' &&
           steps.check_confirm_email_format.outputs.valid == 'true' &&
           steps.check_emails_match.outputs.valid == 'true') }}
@@ -228,9 +267,10 @@ jobs:
             | ----------------------- |:----------------------------------------------:|:----------------------------------------------:|:------------------------------------------------------:|:----------------------------------------------:|
             | Status                  | ${{ steps.check_orcid_format.outputs.emoji }}  | ${{ steps.check_email_format.outputs.emoji }}  | ${{ steps.check_confirm_email_format.outputs.emoji }}  | ${{ steps.check_emails_match.outputs.emoji }}  |
 
-      - name: command results comment (status)
+      - name: command results comment (workshop - validation issues)
         if:
-          ${{ success() && (steps.check_orcid_format.outputs.valid == 'false' ||
+          ${{ steps.request_type.outputs.is_workshop == 'true' && success() &&
+          (steps.check_orcid_format.outputs.valid == 'false' ||
           steps.check_email_format.outputs.valid == 'false' ||
           steps.check_confirm_email_format.outputs.valid == 'false' ||
           steps.check_emails_match.outputs.valid == 'false') }}

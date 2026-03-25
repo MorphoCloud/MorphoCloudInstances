@@ -242,7 +242,47 @@ runs:
     - name: Retrieve or create a floating IP
       if:
         ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
-        == 'unshelve' && steps.check_instance_has_ip.outputs.has_ip_assigned ==
+        == 'unlease any stuck floating IP from instance port
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
+        == 'unshelve' }}
+      id: release_stuck_ip
+      shell: bash
+      run: |
+        source ~/venv/bin/activate
+
+        # SHELVED_OFFLOADED instances have empty addresses in 'openstack server show',
+        # but their Neutron port persists. A previously failed unshelve can leave a
+        # floating IP stuck on that port, causing the subsequent 'associate_ip' step
+        # to fail. Release any such stuck IP unconditionally before proceeding.
+
+        port_id=$(openstack port list --server "$INSTANCE_NAME" -f json | jq -r '.[0].ID // ""')
+        echo "port_id [$port_id]"
+
+        if [[ -z "$port_id" ]]; then
+          echo "No port found for instance, skipping."
+          exit 0
+        fi
+
+        floating_ip_uuid=$(
+          openstack floating ip list -f json | \
+          jq -r --arg port "$port_id" \
+          'map(select(.Port == $port)) | if length > 0 then .[0].ID else "" end'
+        )
+        echo "floating_ip_uuid [$floating_ip_uuid]"
+
+        if [[ -z "$floating_ip_uuid" ]]; then
+          echo "No floating IP attached to port, nothing to release."
+          exit 0
+        fi
+
+        echo "Releasing stuck floating IP $floating_ip_uuid from port $port_id"
+        openstack floating ip unset --port "$floating_ip_uuid"
+      env:
+        OS_CLOUD: ${{ inputs.os_cloud }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+    - name: Reshelve' && steps.check_instance_has_ip.outputs.has_ip_assigned ==
         'false' }}
       id: ip_create
       uses: ./.github/actions/create-ip

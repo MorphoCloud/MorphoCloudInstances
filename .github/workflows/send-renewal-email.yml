@@ -120,7 +120,7 @@ jobs:
       - name: Send renewal email (renewal available)
         id: send_email_renewable
         if: ${{ steps.check_renewal.outputs.renewal_available == 'true' }}
-        uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
+        uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -158,7 +158,7 @@ jobs:
       - name: Send final expiration email (no renewal available)
         id: send_email_final
         if: ${{ steps.check_renewal.outputs.renewal_available == 'false' }}
-        uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
+        uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
           server_address: smtp.gmail.com
           server_port: 465

@@ -1,0 +1,34 @@
+name: "Notify Admins of Team Mention in Comment"
+on:
+  issue_comment:
+    types:
+      - created
+
+permissions:
+  contents: read
+
+jobs:
+  notify-on-mention:
+    runs-on: ubuntu-latest
+    if: >-
+      contains(github.event.comment.body, '@MorphoCloud/morphocloud-admins') &&
+      github.event.comment.user.type != 'Bot'
+    steps:
+      - name: Send mail (admin team mentioned)
+        uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: MorphoCloudPortal <morphocloudportal@gmail.com>
+          to: ${{ vars.MORPHOCLOUD_GITHUB_ADMIN_EMAILS }}
+          subject: "[${{ github.event.repository.name }}] @MorphoCloud/morphocloud-admins mentioned by @${{ github.event.comment.user.login }} in issue #${{ github.event.issue.number }}"
+          body: |
+            @${{ github.event.comment.user.login }} mentioned @MorphoCloud/morphocloud-admins in issue #${{ github.event.issue.number }}.
+
+            Comment:
+            ${{ github.event.comment.body }}
+
+            See: ${{ github.event.comment.html_url }}

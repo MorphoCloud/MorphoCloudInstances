@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: encode_email command
         id: encode_email_command
-        uses: github/command@v2.0.2
+        uses: github/command@v2.0.3
         with:
           command: "/encode_email"
           reaction: "rocket"
@@ -31,7 +31,7 @@ jobs:
 
       - name: decode_email command
         id: decode_email_command
-        uses: github/command@v2.0.2
+        uses: github/command@v2.0.3
         with:
           command: "/decode_email"
           reaction: "rocket"

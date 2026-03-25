@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: approve command
         id: approve_command
-        uses: github/command@v2.0.2
+        uses: github/command@v2.0.3
         with:
           command: "/approve"
           reaction: "rocket"
@@ -25,7 +25,7 @@ jobs:
 
       - name: unapprove command
         id: unapprove_command
-        uses: github/command@v2.0.2
+        uses: github/command@v2.0.3
         with:
           command: "/unapprove"
           reaction: "rocket"

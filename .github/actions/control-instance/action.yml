@@ -239,10 +239,7 @@ runs:
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-    - name: Retrieve or create a floating IP
-      if:
-        ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
-        == 'unlease any stuck floating IP from instance port
+    - name: Release stuck floating IP from port before unshelve
       if:
         ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
         == 'unshelve' }}
@@ -282,7 +279,10 @@ runs:
         OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
-    - name: Reshelve' && steps.check_instance_has_ip.outputs.has_ip_assigned ==
+    - name: Retrieve or create a floating IP
+      if:
+        ${{ steps.check_instance.outputs.exists == 'true' && inputs.command_name
+        == 'unshelve' && steps.check_instance_has_ip.outputs.has_ip_assigned ==
         'false' }}
       id: ip_create
       uses: ./.github/actions/create-ip

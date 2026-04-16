@@ -91,6 +91,14 @@ jobs:
           app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
           private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
 
+      - name: Look up organizer email
+        id: lookup_organizer_email
+        if: ${{ steps.create_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/lookup-email
+        with:
+          lookup_url: ${{ vars.MORPHOCLOUD_WORKSHOP_EMAIL_LOOKUP_URL }}
+          github_username: ${{ github.event.issue.user.login }}
+
       - name: Create instance issues
         if: ${{ steps.create_command.outputs.continue == 'true' }}
         run: |
@@ -167,13 +175,19 @@ jobs:
                 -f "title=$issue_title" \
                 -f "body=$issue_body" \
                 -f "labels[]=request-type:instance" \
+                -f "labels[]=instance-request" \
                 -f "labels[]=request:approved" \
+                -f "labels[]=flavor:$INSTANCE_FLAVOR" \
                 -f "labels[]=$timeout_label" \
-                -f "labels[]=$expiration_label"
+                -f "labels[]=$expiration_label" \
+                -f "assignees[]=$ORGANIZER_USERNAME"
             )
 
             instance_issue_number=$(echo "$instance_issue_json" | jq -r '.number')
             instance_issue_id=$(echo "$instance_issue_json" | jq -r '.id')
+
+            # Rename sub-issue to canonical title: MC-Workshop-<parent>-<sub>
+            gh issue edit "$instance_issue_number" --title "MC-Workshop-${ISSUE_NUMBER}-${instance_issue_number}"
 
             requested_instance_issues+=("$instance_issue_number")
 
@@ -203,7 +217,8 @@ jobs:
 
             set +e
             gh workflow run create-instance-from-workflow.yml \
-              -f issue_number=$instance_issue_number
+              -f issue_number=$instance_issue_number \
+              -f skip_preamble=true
             error_code=$?
             set -e
             if [[ $error_code -ne 0 ]]; then
@@ -227,9 +242,10 @@ jobs:
           REQUEST_TITLE: ${{ steps.extract.outputs.title }}
           REQUEST_DESCRIPTION: ${{ steps.extract.outputs.description }}
           INSTANCE_FLAVOR: ${{ steps.extract.outputs.instance_flavor }}
-          WORKSHOP_EMAIL: ${{ steps.extract.outputs.email }}
-          WORKSHOP_CONFIRM_EMAIL: ${{ steps.extract.outputs.confirm_email }}
+          WORKSHOP_EMAIL: ${{ steps.lookup_organizer_email.outputs.email }}
+          WORKSHOP_CONFIRM_EMAIL: ${{ steps.lookup_organizer_email.outputs.email }}
           # Workshop specific fields
           NUMBER_OF_INSTANCES:
             ${{ steps.extract_workshop.outputs.number_of_instances }}
           DURATION_DAYS: ${{ steps.extract_workshop.outputs.duration_days }}
+          ORGANIZER_USERNAME: ${{ github.event.issue.user.login }}

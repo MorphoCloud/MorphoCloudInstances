@@ -1,0 +1,57 @@
+name: "Check Jetstream2 Status"
+description: >
+  Check for active Jetstream2 outages via the ACCESS Operations API. If an
+  outage is found, posts a warning comment on the issue and sets the
+  outage_detected output to 'true'. Fails gracefully if the API is unreachable
+  (does not block the operation).
+inputs:
+  token:
+    description: "GitHub token for posting issue comments"
+    required: true
+  issue_number:
+    description: "Issue number to post the warning comment on"
+    required: true
+outputs:
+  outage_detected:
+    description:
+      "'true' if an active Jetstream2 outage was detected, 'false' otherwise"
+    value: ${{ steps.check.outputs.outage_detected }}
+runs:
+  using: "composite"
+  steps:
+    - name: Check Jetstream2 status
+      id: check
+      shell: bash
+      run: |
+        RESPONSE=$(curl -sf --max-time 10 \
+          "https://operations-api.access-ci.org/wh2/news/v1/affiliation/access-ci.org/current_outages/") || {
+          echo "ACCESS status API unreachable — skipping outage check"
+          echo "outage_detected=false" >> $GITHUB_OUTPUT
+          exit 0
+        }
+
+        COUNT=$(echo "$RESPONSE" | jq '[
+          .results[]
+          | select(any(.AffectedResources[]?; .ResourceID // "" | ascii_downcase | contains("jetstream2")))
+        ] | length')
+
+        if [[ "$COUNT" -gt 0 ]]; then
+          echo "outage_detected=true" >> $GITHUB_OUTPUT
+
+          OUTAGE_LINES=$(echo "$RESPONSE" | jq -r '
+            .results[]
+            | select(any(.AffectedResources[]?; .ResourceID // "" | ascii_downcase | contains("jetstream2")))
+            | "> - **\(.Subject)** (\(.OutageType // "unknown") outage)\(if (.OutageEnd != null and .OutageEnd != "") then " — expected end: \(.OutageEnd) UTC" else "" end)"
+          ')
+
+          printf '### ⚠️ Jetstream2 Outage Detected\n\nAn active Jetstream2 outage has been reported by [ACCESS-CI System Status](https://operations.access-ci.org/news).\n\n%s\n\n**This is a warning — the operation will proceed**, but it may fail or be delayed. Check the comments below to see success or failure. If it has failed, you may need to retry once the outage is resolved.' \
+            "$OUTAGE_LINES" > /tmp/js2_outage_body.txt
+          gh issue comment "$ISSUE_NUMBER" --body-file /tmp/js2_outage_body.txt
+          rm -f /tmp/js2_outage_body.txt
+        else
+          echo "outage_detected=false" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}

@@ -9,7 +9,7 @@ jobs:
     runs-on: self-hosted
     if:
       ${{ !github.event.issue.pull_request &&
-      contains(github.event.issue.labels.*.name, 'request-type:instance') && (
+      contains(github.event.issue.labels.*.name, 'instance-request') && (
       contains(github.event.comment.body, '/email') ) }}
     steps:
       - name: email command
@@ -55,32 +55,111 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Send mail
+      - name: Determine issue type
+        id: check_type
+        shell: bash
+        run: |
+          is_course=${{ contains(github.event.issue.labels.*.name, 'request-type:course-instance') }}
+          echo "is_course=$is_course" >> $GITHUB_OUTPUT
+          # Workshop sub-issues: expiration ≤ 7 days
+          expiration_days=$(gh issue view "$ISSUE_NUMBER" --json labels \
+            --jq '[.labels[].name | select(. | startswith("expiration:")) | split(":")[1] | sub("d$"; "") | tonumber][0] // 999')
+          if (( $(echo "$expiration_days <= 7" | bc -l) )); then
+            is_workshop="true"
+          else
+            is_workshop="false"
+          fi
+          echo "is_workshop=$is_workshop" >> $GITHUB_OUTPUT
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Send mail (individual)
         id: send_email
+        if:
+          ${{ steps.check_type.outputs.is_course != 'true' &&
+          steps.check_type.outputs.is_workshop != 'true' }}
         uses: ./.github/actions/send-email
         with:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          email_lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
+          issue_creator: ${{ github.event.issue.user.login }}
           mail_server_username: ${{ secrets.MAIL_USERNAME }}
           mail_server_password: ${{ secrets.MAIL_PASSWORD }}
           instance_name: ${{ steps.define.outputs.instance_name }}
           instance_issue_number: ${{ github.event.issue.number }}
 
+      - name: Get workshop organizer
+        id: workshop_org
+        if:
+          ${{ steps.check_type.outputs.is_course != 'true' &&
+          steps.check_type.outputs.is_workshop == 'true' }}
+        shell: bash
+        run: |
+          ASSIGNEE=$(gh issue view "$ISSUE_NUMBER" --json assignees --jq '.assignees[0].login')
+          if [[ -z "$ASSIGNEE" ]]; then
+            echo "::error ::No assignee found on workshop sub-issue #$ISSUE_NUMBER"
+            exit 1
+          fi
+          echo "username=$ASSIGNEE" >> $GITHUB_OUTPUT
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Send mail (workshop)
+        id: send_workshop_email
+        if:
+          ${{ steps.check_type.outputs.is_course != 'true' &&
+          steps.check_type.outputs.is_workshop == 'true' }}
+        uses: ./.github/actions/workshop-send-email
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          email_lookup_url: ${{ vars.MORPHOCLOUD_WORKSHOP_EMAIL_LOOKUP_URL }}
+          github_username: ${{ steps.workshop_org.outputs.username }}
+          mail_server_username: ${{ secrets.MAIL_USERNAME }}
+          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+          instance_issue_number: ${{ github.event.issue.number }}
+
+      - name: Send mail (course)
+        id: send_course_email
+        if: ${{ steps.check_type.outputs.is_course == 'true' }}
+        uses: ./.github/actions/course-send-email
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue_creator: ${{ github.event.issue.user.login }}
+          mail_server_username: ${{ secrets.MAIL_USERNAME }}
+          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
+          email_lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
+          roster_sheet_id: ${{ vars.MORPHOCLOUD_STUDENT_ROSTER_SHEET_ID }}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+          instance_issue_number: ${{ github.event.issue.number }}
+
       - name: command results comment (failed)
-        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
+        if:
+          ${{ (steps.send_email.outcome == 'failure' ||
+          steps.send_workshop_email.outcome == 'failure' ||
+          steps.send_course_email.outcome == 'failure') && failure() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
             ### Command Results ❌
 
-            `email` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance. ${{ steps.send_email.outputs.error_message }}
+            `email` command failed to be applied to **${{ steps.define.outputs.instance_name }}** instance. ${{ steps.send_email.outputs.error_message }}${{ steps.send_workshop_email.outputs.error_message }}${{ steps.send_course_email.outputs.error_message }}
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: command results comment (success)
-        if: ${{ steps.send_email.outcome == 'success' && success() }}
+        if:
+          ${{ (steps.send_email.outcome == 'success' ||
+          steps.send_workshop_email.outcome == 'success' ||
+          steps.send_course_email.outcome == 'success') && success() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ github.event.issue.number }}

@@ -52,6 +52,7 @@ jobs:
           issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
 
       - name: Add flavor label
+        if: ${{ steps.extract.outputs.instance_flavor != '' && steps.extract.outputs.instance_flavor != 'null' }}
         run: gh issue edit "$NUMBER" --add-label "$LABELS"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

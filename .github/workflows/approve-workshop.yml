@@ -63,6 +63,39 @@ jobs:
 
       - uses: actions/checkout@v6
 
+      - uses: actions/create-github-app-token@v2.2.0
+        id: app-token
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'approve' }}
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Check workshop organizer team membership
+        id: check_membership
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'approve' }}
+        uses: ./.github/actions/check-team-membership
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          org: ${{ github.repository_owner }}
+          team_slug: ${{ vars.MORPHOCLOUD_WORKSHOP_ORGANIZERS_TEAM_SLUG }}
+          username: ${{ github.event.issue.user.login }}
+
+      - name: Fail if workshop organizer is not a team member
+        if:
+          ${{ steps.command.outputs.continue == 'true' &&
+          steps.command.outputs.command_name == 'approve' &&
+          steps.check_membership.outputs.is_member != 'true' }}
+        run: |
+          echo "::error ::User ${{ github.event.issue.user.login }} is not a member of ${{ vars.MORPHOCLOUD_WORKSHOP_ORGANIZERS_TEAM_SLUG }}"
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
       - name: Remove "request:approved" label
         if:
           ${{ steps.command.outputs.continue == 'true' &&
@@ -95,7 +128,7 @@ jobs:
         uses: ./.github/actions/send-workshop-email-approval
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          email_lookup_url: ${{ vars.MORPHOCLOUD_WORKSHOP_EMAIL_LOOKUP_URL }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}
           workshop_issue_number: ${{ github.event.issue.number }}

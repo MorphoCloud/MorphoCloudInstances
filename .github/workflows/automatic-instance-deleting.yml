@@ -42,9 +42,10 @@ jobs:
             # Extract the issue number from the instance name
             issue_number=${instance_name##*-}  # Extract issue number
 
-            # Retrieve issue creation date from GitHub
-            issue_json=$(gh issue view "$issue_number" --json createdAt)
+            # Retrieve issue creation date and state from GitHub
+            issue_json=$(gh issue view "$issue_number" --json createdAt,state)
             created_at=$(echo "$issue_json" | jq -r '.createdAt')
+            issue_state=$(echo "$issue_json" | jq -r '.state')
 
             # Convert ISO 8601 timestamp to epoch time
             created_at_epoch=$(date -d "$created_at" +%s)
@@ -146,11 +147,67 @@ jobs:
                   continue
                 fi
 
+                # For workshop instances (expiration <= 7 days), close the sub-issue
+                # and potentially the parent workshop issue
+                if (( $(echo "$expiration_days <= 7" | bc -l) )); then
+                  echo "Closing workshop instance issue #${issue_number}..."
+                  gh issue close "$issue_number" \
+                    --comment "Instance **${instance_name}** and its associated volume have been automatically deleted upon expiration. Closing issue."
+
+                  # Find the parent workshop issue by scanning open workshop issues
+                  parent_issue_number=""
+                  open_workshop_issues=$(gh issue list \
+                    --repo "$GH_REPO" \
+                    --label "request-type:workshop" \
+                    --state open \
+                    --json number \
+                    --limit 100 \
+                    --jq '[.[].number]')
+
+                  for workshop_issue_num in $(echo "$open_workshop_issues" | jq -r '.[]'); do
+                    sub_issues_of_workshop=$(gh api \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      "/repos/$GH_REPO/issues/$workshop_issue_num/sub_issues" \
+                      --paginate \
+                      --jq '[.[].number]' 2>/dev/null || echo "[]")
+
+                    if echo "$sub_issues_of_workshop" | jq -e "index($issue_number) != null" > /dev/null; then
+                      parent_issue_number="$workshop_issue_num"
+                      break
+                    fi
+                  done
+
+                  if [[ -n "$parent_issue_number" ]]; then
+                    echo "Found parent workshop issue: #${parent_issue_number}"
+
+                    # Check if all sub-issues of the parent workshop issue are now closed
+                    open_sub_issues=$(gh api \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "X-GitHub-Api-Version: 2022-11-28" \
+                      "/repos/$GH_REPO/issues/$parent_issue_number/sub_issues" \
+                      --paginate \
+                      --jq '[.[] | select(.state == "open")] | length')
+
+                    echo "Open sub-issues for workshop #${parent_issue_number}: ${open_sub_issues}"
+
+                    if [[ "$open_sub_issues" == "0" ]]; then
+                      echo "All sub-issues closed. Closing parent workshop issue #${parent_issue_number}..."
+                      gh issue close "$parent_issue_number" \
+                        --comment "All workshop instances have expired and been deleted. Closing workshop issue."
+                    fi
+                  fi
+                fi
+
               elif [[ "$days_until_expiration" -le $EXPIRATION_WARNING_DAYS ]]; then
+                # Skip renewal emails if the issue is already closed (e.g. manually closed without deleting resources)
+                # The deletion branch above still runs regardless of issue state when expiration passes
+                if [[ "$issue_state" == "CLOSED" ]]; then
+                  echo "Skipping renewal email for ${instance_name}: issue #${issue_number} is closed (resources will still be deleted at expiration)"
                 # Skip renewal emails for workshop instances (expiration <= 7 days)
                 # Workshop instances are temporary and not meant to be renewed
                 # Use bc for floating-point comparison
-                if (( $(echo "$expiration_days <= 7" | bc -l) )); then
+                elif (( $(echo "$expiration_days <= 7" | bc -l) )); then
                   echo "Skipping renewal email for workshop instance ${instance_name} (expires in ${expiration_days} days)"
                 else
                   echo "Instance ${instance_name} will expire soon. Sending warning..."

@@ -1,0 +1,55 @@
+name: Runner Setup Helper
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  print-setup-commands:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print parameterized setup commands
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          COURSE="${REPO#MC-}"
+          COURSE_LOWER=$(echo "$COURSE" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          OS_CLOUD="${{ vars.MORPHOCLOUD_OS_CLOUD }}"
+
+          {
+            echo "## Runner Setup — ${REPO}"
+            echo ""
+            echo "Use these values throughout \`runner-setup.md\`."
+            echo ""
+            echo "| Item | Value |"
+            echo "| ---- | ----- |"
+            echo "| Runner VM name | \`mc-${COURSE_LOWER}-runner\` |"
+            echo "| App credential name | \`mc-${COURSE_LOWER}-runner\` |"
+            echo "| clouds.yaml entry name | \`${OS_CLOUD}\` |"
+            echo "| Runner config URL | \`https://github.com/MorphoCloud/${REPO}\` |"
+            echo "| Suggested runner label | \`mc-${COURSE_LOWER}-runner\` |"
+            echo ""
+            echo "### clouds.yaml snippet (Step 5)"
+            echo ""
+            echo "Place at \`~/.config/openstack/clouds.yaml\` on the runner:"
+            echo ""
+            echo '```yaml'
+            echo "clouds:"
+            echo "  ${OS_CLOUD}:"
+            echo "    auth:"
+            echo "      auth_url: https://js2.jetstream-cloud.org:5000/v3/"
+            echo "      application_credential_id: <ID from Step 4>"
+            echo "      application_credential_secret: <Secret from Step 4>"
+            echo "    auth_type: v3applicationcredential"
+            echo "    identity_api_version: \"3\""
+            echo "    region_name: IU"
+            echo '```'
+            echo ""
+            echo "### Runner config command (Step 6)"
+            echo ""
+            echo '```bash'
+            echo "./config.sh --url https://github.com/MorphoCloud/${REPO} --token <TOKEN_FROM_GITHUB>"
+            echo "# When prompted for runner name, enter: mc-${COURSE_LOWER}-runner"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

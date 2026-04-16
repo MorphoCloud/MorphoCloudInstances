@@ -1,4 +1,4 @@
-name: "Notify Admins of Instance Request"
+name: "Notify Admins of Workshop Request"
 on:
   workflow_dispatch:
     inputs:
@@ -14,8 +14,6 @@ on:
 
 jobs:
   request_notify_admins:
-    if:
-      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') }}
     runs-on: ubuntu-latest
     steps:
       - name: Collect Inputs
@@ -39,17 +37,8 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
 
-      - uses: actions/checkout@v6
-
-      - name: Define instance name
-        id: define
-        uses: ./.github/actions/define-instance-name
-        with:
-          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
-          issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
-
-      - name: Send mail (approval requested)
-        uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
+      - name: Send mail (workshop approval requested)
+        uses: dawidd6/action-send-mail@6d98ae34d733f9a723a9e04e94f2f24ba05e1402 # v6
         with:
           server_address: webhost.dynadot.com
           server_port: 587
@@ -59,7 +48,10 @@ jobs:
           from: MorphoCloudPortal <no-reply@morphocloud.org>
           to: ${{ vars.MORPHOCLOUD_GITHUB_ADMIN_EMAILS }}
           subject:
-            "[${{ github.event.repository.name }}] Approval requested for
-            Instance ${{ steps.define.outputs.instance_name }}"
+            "[${{ github.event.repository.name }}] Workshop approval requested
+            by @${{ github.event.issue.user.login }}"
           body: |
-            See https://github.com/${{ github.repository }}/issues/${{ steps.collect_inputs.outputs.issue_number }}
+            @${{ github.event.issue.user.login }} has submitted a new workshop request.
+
+            Review and approve or reject it at:
+            https://github.com/${{ github.repository }}/issues/${{ steps.collect_inputs.outputs.issue_number }}

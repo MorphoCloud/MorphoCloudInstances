@@ -1,0 +1,233 @@
+name: "Instance/Workshop Request Handler"
+on:
+  issues:
+    types:
+      - opened
+
+permissions:
+  issues: write
+  contents: read
+  checks: read
+
+jobs:
+  check-instance-team-membership:
+    runs-on: ubuntu-latest
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/create-github-app-token@v2.2.0
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Check MorphoCloudUsers team membership
+        id: check_membership
+        uses: ./.github/actions/check-team-membership
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          org: ${{ github.repository_owner }}
+          team_slug: ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}
+          username: ${{ github.event.issue.user.login }}
+
+      - name: Reject non-member
+        if: ${{ steps.check_membership.outputs.is_member != 'true' }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "### Authorization Failed ❌
+
+          @$ISSUE_CREATOR is not a member of the **$TEAM_SLUG** team.
+
+          To request an instance, please complete the [MorphoCloud intake form](https://forms.gle/morphocloud-intake) first and accept the GitHub organization invitation.
+
+          This issue will be closed."
+
+          gh issue close "$ISSUE_NUMBER"
+          gh issue edit "$ISSUE_NUMBER" --add-label "error:not-authorized"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
+          TEAM_SLUG: ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}
+
+      - name: Fail if not authorized
+        if: ${{ steps.check_membership.outputs.is_member != 'true' }}
+        run: |
+          echo "::error ::User ${{ github.event.issue.user.login }} is not a member of ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}"
+          exit 1
+
+  check-instance-quota:
+    needs: [check-instance-team-membership]
+    runs-on: ubuntu-latest
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    steps:
+      - name: Check per-user instance quota
+        run: |
+          MAX_PER_USER="${MAX_PER_USER:-2}"
+          # Admin bypass
+          if echo ",$ADMINS," | grep -q ",$ISSUE_CREATOR,"; then
+            echo "Admin $ISSUE_CREATOR — skipping quota check."
+            exit 0
+          fi
+
+          # Count open instance request issues for this user (individual + course), excluding the current one.
+          # Simple open-issue count: if the user already has MAX_PER_USER open requests, reject immediately.
+          # No OpenStack access needed — Layer 2 (at /create time) does the authoritative resource check.
+          INDIV_JSON=$(gh issue list \
+            --author "$ISSUE_CREATOR" \
+            --label "request-type:instance" \
+            --state open \
+            --limit 200 \
+            --json number)
+          COURSE_JSON=$(gh issue list \
+            --author "$ISSUE_CREATOR" \
+            --label "request-type:course-instance" \
+            --state open \
+            --limit 200 \
+            --json number)
+          ALL_JSON=$(jq -n --argjson a "$INDIV_JSON" --argjson b "$COURSE_JSON" '$a + $b')
+
+          # Exclude the current issue (just opened, already in the list)
+          EXISTING=$(echo "$ALL_JSON" | jq --argjson cur "$ISSUE_NUMBER" '[.[] | select(.number != $cur)]')
+          USER_COUNT=$(echo "$EXISTING" | jq 'length')
+          echo "User $ISSUE_CREATOR already has $USER_COUNT open instance request(s) (limit: $MAX_PER_USER)."
+
+          if [[ "$USER_COUNT" -ge "$MAX_PER_USER" ]]; then
+            ISSUE_LINKS=$(echo "$EXISTING" | jq -r '[.[] | "#\(.number)"] | join(", ")')
+            gh issue comment "$ISSUE_NUMBER" --body "### Instance Request Rejected ❌
+
+          @${ISSUE_CREATOR} already has **${USER_COUNT}** open instance request(s) (${ISSUE_LINKS}), which is the maximum of **${MAX_PER_USER}**.
+
+          You already have open requests — please use one of those existing issues. If your instance resources have been deleted, you can run \`/create\` directly in an existing issue to get a new instance.
+
+          > @MorphoCloud/morphocloud-admins — FYI, @${ISSUE_CREATOR} has reached the open-issue limit ($USER_COUNT/$MAX_PER_USER)."
+            gh issue close "$ISSUE_NUMBER"
+            echo "::error ::User $ISSUE_CREATOR has $USER_COUNT open instance requests (limit: $MAX_PER_USER)"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
+          ADMINS: ${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}
+          MAX_PER_USER: ${{ vars.MORPHOCLOUD_MAX_INSTANCES_PER_USER }}
+
+  call-validate-request:
+    needs: [check-instance-team-membership, check-instance-quota]
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/validate-request.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  check-workshop-organizer-membership:
+    runs-on: ubuntu-latest
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:workshop') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/create-github-app-token@v2.2.0
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Check MorphoCloudWorkshopOrganizers team membership
+        id: check_membership
+        uses: ./.github/actions/check-team-membership
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          org: ${{ github.repository_owner }}
+          team_slug: ${{ vars.MORPHOCLOUD_WORKSHOP_ORGANIZERS_TEAM_SLUG }}
+          username: ${{ github.event.issue.user.login }}
+
+      - name: Reject non-member
+        if: ${{ steps.check_membership.outputs.is_member != 'true' }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "### Authorization Failed ❌
+
+          @$ISSUE_CREATOR is not a member of the **$TEAM_SLUG** team.
+
+          To request a workshop, please complete the [MorphoCloud workshop organizer intake form](https://forms.gle/morphocloud-workshop-intake) first and accept the GitHub organization invitation.
+
+          This issue will be closed."
+
+          gh issue close "$ISSUE_NUMBER"
+          gh issue edit "$ISSUE_NUMBER" --add-label "error:not-authorized"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
+          TEAM_SLUG: ${{ vars.MORPHOCLOUD_WORKSHOP_ORGANIZERS_TEAM_SLUG }}
+
+      - name: Fail if not authorized
+        if: ${{ steps.check_membership.outputs.is_member != 'true' }}
+        run: |
+          echo "::error ::User ${{ github.event.issue.user.login }} is not a member of ${{ vars.MORPHOCLOUD_WORKSHOP_ORGANIZERS_TEAM_SLUG }}"
+          exit 1
+
+  call-validate-request-workshop:
+    needs: [check-workshop-organizer-membership]
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:workshop') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/validate-request.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  call-request-notify-admin-workshop:
+    needs: [check-workshop-organizer-membership]
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:workshop') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-notify-admin-workshop.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  call-request-labeler:
+    needs: [check-instance-team-membership, check-instance-quota]
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-labeler.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  call-request-initial-comments:
+    needs: [check-instance-team-membership, check-instance-quota]
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    uses: ./.github/workflows/request-initial-comments.yml
+    with:
+      issue_number: "${{ github.event.issue.number }}"
+    secrets: inherit
+
+  rename-instance-issue:
+    needs: [check-instance-team-membership, check-instance-quota]
+    runs-on: ubuntu-latest
+    if:
+      ${{ contains(github.event.issue.labels.*.name, 'request-type:instance') &&
+      contains(github.event.issue.labels.*.name, 'request-creator:user') }}
+    steps:
+      - name: Rename issue to canonical title
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --title "MC-Individual-${ISSUE_NUMBER}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}

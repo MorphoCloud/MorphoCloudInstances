@@ -16,9 +16,10 @@ jobs:
     env:
       LABELS_JSON: |
         [
-          {"name": "flavor:g3.large", "color": "D93F0B", "description": "GPU instance (16 CPUs, 60 GB RAM, 50% of A100 GPU)"},
-          {"name": "flavor:g3.xl", "color": "D93F0B", "description": "GPU instance (32 CPUs, 125 GB RAM, A100 GPU)"},
-          {"name": "flavor:m3.xl", "color": "D93F0B", "description": "General-purpose instance (32 CPUs, 125 GB RAM)"},
+          {"name": "flavor:g3.large", "color": "D93F0B", "description": "GPU instance (16 CPUs, 60 GB RAM, 50% A100 GPU)"},
+          {"name": "flavor:g3.xl", "color": "D93F0B", "description": "GPU instance (32 CPUs, 120 GB RAM, A100 GPU)"},
+          {"name": "flavor:g4.xl", "color": "D93F0B", "description": "GPU instance (12 CPUs, 120 GB RAM, L40S GPU)"},
+          {"name": "flavor:m3.large", "color": "D93F0B", "description": "General-purpose instance (16 CPUs, 60 GB RAM)"},
           {"name": "flavor:r3.large", "color": "D93F0B", "description": "Large Memory instance (64 CPUs, 500 GB RAM)"},
           {"name": "flavor:r3.xl", "color": "D93F0B", "description": "Large Memory instance (128 CPUs, 1000 GB RAM)"},
           {"name": "expiration:1d", "color": "892368", "description": "Instance expires in 1 day"},
@@ -34,6 +35,8 @@ jobs:
           {"name": "request:approved", "color": "027210", "description": "Instance has been approved for creation and is being provisioned"},
           {"name": "request-type:instance", "color": "0A84FF", "description": "Issue tracks a single instance request"},
           {"name": "request-type:workshop", "color": "0A84FF", "description": "Issue tracks a workshop bulk instance request"},
+          {"name": "request-type:course-instance", "color": "0A84FF", "description": "Issue tracks a course/class instance request"},
+          {"name": "instance-request", "color": "0075CA", "description": "Shared lifecycle trigger label for all instance issue types"},
           {"name": "request-creator:user", "color": "7B6F4C", "description": "Issue was explicitly created by the user"},
           {"name": "renewed:1", "color": "1550D4", "description": "Instance lifespan renewed once"},
           {"name": "renewed:2", "color": "1550D4", "description": "Instance lifespan renewed twice"},
@@ -62,7 +65,8 @@ jobs:
           {"name": "status:verify_resize", "color": "CFD3D7", "description": "System is awaiting confirmation that the server is operational after a move or resize."},
           {"name": "timeout:4hrs", "color": "5319E7", "description": "Duration in hours after which the instance will be stopped"},
           {"name": "volume:deleted", "color": "0E8CDB", "description": "The volume has been permanently deleted after the grace period."},
-          {"name": "volume:expiration-pending", "color": "0E8CDB", "description": "The volume is detached and will be deleted after the grace period."}
+          {"name": "volume:expiration-pending", "color": "0E8CDB", "description": "The volume is detached and will be deleted after the grace period."},
+          {"name": "error:system-capacity", "color": "B60205", "description": "Instance request rejected: system capacity limit reached"}
         ]
     steps:
       - name: Create or Update Labels

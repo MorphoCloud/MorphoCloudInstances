@@ -13,15 +13,6 @@ inputs:
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
-  string_encryption_key:
-    description: "Encryption key to encode and decode the email address"
-    required: true
-  mail_server_username:
-    description: "mail server username"
-    required: true
-  mail_server_password:
-    description: "mail server password"
-    required: true
 runs:
   using: "composite"
   steps:
@@ -62,18 +53,6 @@ runs:
       with:
         prefix: ${{ inputs.instance_name_prefix }}
         issue_number: ${{ inputs.issue_number }}
-
-    - name: Send approval mail
-      if: ${{ inputs.command_name == 'approve' }}
-      id: send_email
-      uses: ./.github/actions/send-email-approval
-      with:
-        token: ${{ inputs.token }}
-        string_encryption_key: ${{ inputs.string_encryption_key }}
-        mail_server_username: ${{ inputs.mail_server_username }}
-        mail_server_password: ${{ inputs.mail_server_password }}
-        instance_name: ${{ steps.define.outputs.instance_name }}
-        instance_issue_number: ${{ github.event.issue.number }}
 
     - name: Comment (approval confirmation)
       if: ${{ inputs.command_name == 'approve' }}

@@ -159,7 +159,6 @@ jobs:
 
               if [[ -n "$instance_id" ]]; then
                 echo "→ WOULD DELETE instance: $instance_name"
-                echo "→ WOULD CLOSE issue #${issue_number}"
 
                 if [[ "$dry_run" != "true" ]]; then
                   echo ""
@@ -172,105 +171,6 @@ jobs:
                 fi
               else
                 echo "→ Instance does not exist, skipping instance deletion"
-                echo "→ WOULD CLOSE issue #${issue_number}"
-              fi
-
-              if [[ "$dry_run" != "true" ]]; then
-                echo ""
-                echo "=== EXECUTING: Close Sub-Issue and Parent Workshop Issue ==="
-                gh issue close "$issue_number" \
-                  --comment "Instance **${instance_name}** and its associated volume have been automatically deleted upon expiration. Closing issue."
-
-                # Find the parent workshop issue by scanning open workshop issues
-                parent_issue_number=""
-                open_workshop_issues=$(gh issue list \
-                  --repo "$GH_REPO" \
-                  --label "request-type:workshop" \
-                  --state open \
-                  --json number \
-                  --limit 100 \
-                  --jq '[.[].number]')
-
-                for workshop_issue_num in $(echo "$open_workshop_issues" | jq -r '.[]'); do
-                  sub_issues_of_workshop=$(gh api \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    "/repos/$GH_REPO/issues/$workshop_issue_num/sub_issues" \
-                    --paginate \
-                    --jq '[.[].number]' 2>/dev/null || echo "[]")
-
-                  if echo "$sub_issues_of_workshop" | jq -e "index($issue_number) != null" > /dev/null; then
-                    parent_issue_number="$workshop_issue_num"
-                    break
-                  fi
-                done
-
-                if [[ -n "$parent_issue_number" ]]; then
-                  echo "Found parent workshop issue: #${parent_issue_number}"
-
-                  open_sub_issues=$(gh api \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    "/repos/$GH_REPO/issues/$parent_issue_number/sub_issues" \
-                    --paginate \
-                    --jq '[.[] | select(.state == "open")] | length')
-
-                  echo "Open sub-issues for workshop #${parent_issue_number}: ${open_sub_issues}"
-
-                  if [[ "$open_sub_issues" == "0" ]]; then
-                    echo "All sub-issues closed. Closing parent workshop issue #${parent_issue_number}..."
-                    gh issue close "$parent_issue_number" \
-                      --comment "All workshop instances have expired and been deleted. Closing workshop issue."
-                    echo "✅ Parent workshop issue #${parent_issue_number} closed"
-                  else
-                    echo "ℹ️ ${open_sub_issues} sub-issue(s) still open; parent workshop issue remains open"
-                  fi
-                else
-                  echo "ℹ️ No parent workshop issue found for issue #${issue_number}"
-                fi
-              else
-                # Dry run: show what would happen with parent workshop issue
-                parent_issue_number=""
-                open_workshop_issues=$(gh issue list \
-                  --repo "$GH_REPO" \
-                  --label "request-type:workshop" \
-                  --state open \
-                  --json number \
-                  --limit 100 \
-                  --jq '[.[].number]')
-
-                for workshop_issue_num in $(echo "$open_workshop_issues" | jq -r '.[]'); do
-                  sub_issues_of_workshop=$(gh api \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    "/repos/$GH_REPO/issues/$workshop_issue_num/sub_issues" \
-                    --paginate \
-                    --jq '[.[].number]' 2>/dev/null || echo "[]")
-
-                  if echo "$sub_issues_of_workshop" | jq -e "index($issue_number) != null" > /dev/null; then
-                    parent_issue_number="$workshop_issue_num"
-                    break
-                  fi
-                done
-
-                if [[ -n "$parent_issue_number" ]]; then
-                  echo "→ Parent workshop issue: #${parent_issue_number}"
-                  open_sub_issues=$(gh api \
-                    -H "Accept: application/vnd.github+json" \
-                    -H "X-GitHub-Api-Version: 2022-11-28" \
-                    "/repos/$GH_REPO/issues/$parent_issue_number/sub_issues" \
-                    --paginate \
-                    --jq '[.[] | select(.state == "open")] | length')
-                  echo "→ Open sub-issues (before this one closes): ${open_sub_issues}"
-                  remaining=$((open_sub_issues - 1))
-                  if [[ "$remaining" -le 0 ]]; then
-                    echo "→ WOULD CLOSE parent workshop issue #${parent_issue_number} (last sub-issue)"
-                  else
-                    echo "→ Parent workshop issue #${parent_issue_number} would remain open (${remaining} other sub-issue(s) still open)"
-                  fi
-                else
-                  echo "→ No parent workshop issue found"
-                fi
               fi
 
             else

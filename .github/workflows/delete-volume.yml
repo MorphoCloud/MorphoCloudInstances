@@ -9,7 +9,7 @@ jobs:
     runs-on: self-hosted
     if:
       ${{ !github.event.issue.pull_request &&
-      contains(github.event.issue.labels.*.name, 'instance-request') && (
+      contains(github.event.issue.labels.*.name, 'request-type:instance') && (
       contains(github.event.comment.body, '/delete_volume') ) }}
     steps:
       - name: delete_volume command

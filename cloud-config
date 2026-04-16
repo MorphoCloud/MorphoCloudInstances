@@ -107,7 +107,8 @@ users:
     groups: sudo, admin
     sudo: ['ALL=(ALL) NOPASSWD:ALL'] # {ssh-authorized-keys}
     ssh-authorized-keys:
-      - {runner-ssh-public-key}
+      - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAzSP8d9E0/iWqe/emHwYAiMF7EI9TTswoKRvKwP5qTe/djXL2kj0M+EfRf952D5agvnNXp4ldBDJwmvoZIs92Y+9GgAWBmkRwxH8e78p9rLlaZV4skGL1N+CIYi06eFHrQqn6h5qs0Dx710AAdL9jF6VZWvUnGvDDQ+/HnuKcNUtQT0S58tu0Cdn+LifX2WjesyjfxcUnjLpblz987Fiez7fmMGDnUDKqjdiwTAHyMVAff1QIvZ/pJeCfy0CcAgLkgeAaynmrVKIBjz6wyQk/5zV6Dum3/nkpZ/b6c+cou8UQeIDTiu9EPKLWSpz1UjgUxy9ZM009Vmqpw4f0WQaLXw== jchris.fillionr@kitware.com
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILpad9EojP42y5JAVyeiHI+zlKgb3FGmXFLfJMUwmzsE morpho-cloud-portal_github-runner
 ssh_pwauth: true
 package_update: true
 package_upgrade: true # {install-os-updates}

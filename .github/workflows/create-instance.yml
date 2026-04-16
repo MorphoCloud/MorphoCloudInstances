@@ -22,157 +22,31 @@ jobs:
           permissions: "read,triage,write,maintain,admin"
           allowlist:
             "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }},${{
-            github.event.issue.user.login }},${{
-            join(github.event.issue.assignees.*.login, ',') }}"
+            github.event.issue.user.login }}"
 
       - uses: actions/checkout@v6
 
-      - uses: actions/create-github-app-token@v2.2.0
-        id: app-token
+      - name:
+          Convenienty add "request:approved" label if comment added by an admin
+        uses: actions/github-script@v8
         with:
-          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
-          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
-
-      - name: Check authorization
-        id: check_auth
-        shell: bash
-        run: |
-          ENCODED_CREATOR=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$ISSUE_CREATOR'))")
-          HTTP_CODE=$(curl -s -o /tmp/membership_response.json -w "%{http_code}" \
-            -H "Authorization: Bearer $APP_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/orgs/$ORG/teams/$USERS_TEAM_SLUG/memberships/$ENCODED_CREATOR") || true
-
-          authorized="false"
-          if [[ "$HTTP_CODE" == "200" ]]; then
-            STATE=$(jq -r '.state' /tmp/membership_response.json)
-            if [[ "$STATE" == "active" ]]; then
-              authorized="true"
-            fi
-          fi
-          rm -f /tmp/membership_response.json
-
-          if [[ "$authorized" != "true" ]]; then
-            gh issue comment "$ISSUE_NUMBER" --body "### Command Results ❌
-
-          \`/create\` command failed because @${ISSUE_CREATOR} is not an authorized member of the **${USERS_TEAM_SLUG}** team."
-            echo "::error ::User $ISSUE_CREATOR is not authorized"
-            exit 1
-          fi
+          script: |
+            const admins = process.env.MORPHOCLOUD_GITHUB_ADMINS.split(',').map(s => s.trim());
+            const actor = context.payload.comment.user.login;
+            if (admins.includes(actor)) {
+              await github.rest.issues.addLabels({
+                issue_number: context.payload.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ["request:approved"]
+              });
+            } else {
+              core.info(`${actor} is not in the list of admins`);
+            }
         env:
-          APP_TOKEN: ${{ steps.app-token.outputs.token }}
-          ORG: ${{ github.repository_owner }}
-          USERS_TEAM_SLUG: ${{ vars.MORPHOCLOUD_USERS_TEAM_SLUG }}
-          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      - name: Check instance quota
-        id: check_quota
-        shell: bash
-        run: |
-          MAX_PER_USER="${MAX_PER_USER:-2}"
-          MAX_TOTAL="${MAX_TOTAL:-90}"
-          # Admin bypass
-          if echo ",$ADMINS," | grep -q ",$ISSUE_CREATOR,"; then
-            echo "Admin $ISSUE_CREATOR — skipping quota check."
-            exit 0
-          fi
-
-          source ~/venv/bin/activate
-
-          # Fetch all OpenStack instances in one call
-          SERVERS_JSON=$(openstack server list -f json)
-          TOTAL_COUNT=$(echo "$SERVERS_JSON" | jq 'length')
-          OS_NAMES=$(echo "$SERVERS_JSON" | jq -r '.[].Name')
-
-          echo "Total instances in OpenStack: $TOTAL_COUNT (system limit: $MAX_TOTAL)"
-
-          # Global capacity check
-          if [[ "$TOTAL_COUNT" -ge "$MAX_TOTAL" ]]; then
-            gh issue comment "$ISSUE_NUMBER" --body "### Command Results ❌
-
-          The system has reached its capacity limit of **${MAX_TOTAL}** instances. No new instances can be provisioned at this time.
-
-          Please try again later or contact @MorphoCloud/morphocloud-admins for assistance.
-
-          > @MorphoCloud/morphocloud-admins — ⚠️ System capacity limit reached ($TOTAL_COUNT/$MAX_TOTAL). @${ISSUE_CREATOR} is waiting."
-            gh issue edit "$ISSUE_NUMBER" --add-label "error:system-capacity"
-            echo "::error ::System capacity: $TOTAL_COUNT/$MAX_TOTAL"
-            exit 1
-          fi
-
-          # Per-user check: count user's issue numbers (individual + course, open AND closed)
-          # that have a live OpenStack instance or volume — catches manually-closed issues with orphaned resources.
-          INSTANCE_PREFIX="${INSTANCE_NAME_PREFIX:+${INSTANCE_NAME_PREFIX}_}"
-          OS_VOLUME_NAMES=$(openstack volume list -f json | jq -r '.[].Name')
-          INDIV_NUMS=$(gh issue list \
-            --author "$ISSUE_CREATOR" \
-            --label "request-type:instance" \
-            --state all \
-            --limit 200 \
-            --json number \
-            --jq '.[].number' | grep -v "^${ISSUE_NUMBER}$" || true)
-          COURSE_NUMS=$(gh issue list \
-            --author "$ISSUE_CREATOR" \
-            --label "request-type:course-instance" \
-            --state all \
-            --limit 200 \
-            --json number \
-            --jq '.[].number' | grep -v "^${ISSUE_NUMBER}$" || true)
-          ISSUE_NUMBERS=$(printf "%s\n%s" "$INDIV_NUMS" "$COURSE_NUMS" | grep -v '^$' || true)
-
-          USER_COUNT=0
-          OCCUPIED_ISSUES=""
-          while IFS= read -r NUM; do
-            [[ -z "$NUM" ]] && continue
-            INSTANCE_NAME="${INSTANCE_PREFIX}instance-${NUM}"
-            VOLUME_NAME="My-Data-${NUM}"
-            if echo "$OS_NAMES" | grep -qx "$INSTANCE_NAME" || \
-               echo "$OS_VOLUME_NAMES" | grep -qE "^${VOLUME_NAME}(-.*)?$"; then
-              (( ++USER_COUNT ))
-              OCCUPIED_ISSUES="${OCCUPIED_ISSUES} #${NUM}"
-            fi
-          done <<< "$ISSUE_NUMBERS"
-          OCCUPIED_ISSUES=$(echo "$OCCUPIED_ISSUES" | xargs | tr ' ' ', ')
-
-          echo "User $ISSUE_CREATOR has $USER_COUNT active OpenStack instance(s) across all types (limit: $MAX_PER_USER)"
-
-          if [[ "$USER_COUNT" -ge "$MAX_PER_USER" ]]; then
-            gh issue comment "$ISSUE_NUMBER" --body "### Command Results ❌
-
-          @${ISSUE_CREATOR} already has **${USER_COUNT}** active instance(s), which is at the per-user limit of **${MAX_PER_USER}**.
-
-          Existing instance(s) found in OpenStack: ${OCCUPIED_ISSUES}
-
-          Go to one of those issues and type \`/delete_all\` to free your quota before creating a new one.
-
-          > @MorphoCloud/morphocloud-admins — FYI, @${ISSUE_CREATOR} has reached the per-user instance limit ($USER_COUNT/$MAX_PER_USER)."
-            echo "::error ::User $ISSUE_CREATOR has $USER_COUNT/$MAX_PER_USER instances"
-            exit 1
-          fi
-        env:
-          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
-          INSTANCE_NAME_PREFIX: ${{ vars.INSTANCE_NAME_PREFIX }}
-          ISSUE_CREATOR: ${{ github.event.issue.user.login }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ADMINS: ${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}
-          MAX_PER_USER: ${{ vars.MORPHOCLOUD_MAX_INSTANCES_PER_USER }}
-          MAX_TOTAL: ${{ vars.MORPHOCLOUD_MAX_TOTAL_INSTANCES }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      - name: Check JS2 status
-        id: js2_status
-        uses: ./.github/actions/check-js2-status
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          issue_number: ${{ github.event.issue.number }}
+          MORPHOCLOUD_GITHUB_ADMINS: ${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}
 
       - name: Create instance
-        id: provision
         uses: ./.github/actions/create-instance
         with:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
@@ -180,42 +54,6 @@ jobs:
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           volume_name_suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Send email
-        id: send_email
-        if: ${{ steps.provision.outputs.setup_status == 'complete' }}
-        uses: ./.github/actions/send-email
-        with:
-          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          email_lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
-          issue_creator: ${{ github.event.issue.user.login }}
-          mail_server_username: ${{ secrets.MAIL_USERNAME }}
-          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
-          instance_name: ${{ steps.provision.outputs.instance_name }}
-          instance_issue_number: ${{ github.event.issue.number }}
-
-      - name: comment (failed to send email)
-        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v5.0.0
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            ### Instance Creation Results ❌
-
-            Failed to send connection email for instance **${{ steps.provision.outputs.instance_name }}**. ${{ steps.send_email.outputs.error_message }}
-
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: comment (progress)
-        if: ${{ steps.send_email.outcome == 'success' }}
-        uses: ./.github/actions/comment-progress
-        with:
-          comment-id: ${{ steps.provision.outputs.progress_comment_id }}
-          create_ip: ✅
-          create_volume: ✅
-          create_instance: ✅
-          associate_ip: ✅
-          setup_instance: ✅
-          attach_volume: ✅
-          send_email: ✅
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}

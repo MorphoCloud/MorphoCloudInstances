@@ -18,16 +18,15 @@ inputs:
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
-outputs:
-  instance_name:
-    description: "Name of the provisioned instance"
-    value: ${{ steps.define.outputs.instance_name }}
-  setup_status:
-    description: "Instance setup status ('complete' when ready)"
-    value: ${{ steps.instance_poll.outputs.status }}
-  progress_comment_id:
-    description: "GitHub comment ID for the progress tracking comment"
-    value: ${{ steps.couc_progress.outputs.comment-id }}
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
+  mail_server_username:
+    description: "mail server username"
+    required: true
+  mail_server_password:
+    description: "mail server password"
+    required: true
 runs:
   using: "composite"
   steps:
@@ -38,22 +37,31 @@ runs:
         prefix: ${{ inputs.instance_name_prefix }}
         issue_number: ${{ inputs.issue_number }}
 
-    - name: Add request:approved label and remove stale labels
+    - name: Check instance management approval
+      id: check_approval
+      uses: ./.github/actions/check-approval
+      with:
+        token: ${{ inputs.token }}
+        issue_number: ${{ inputs.issue_number }}
+
+    - name: command results comment (Instance management not approved)
+      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
+      uses: peter-evans/create-or-update-comment@v5.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Command Results ❌
+
+          `/create` command failed because management of **${{ steps.define.outputs.instance_name }}** has not been approved yet.
+
+    - name: instance management not approved (failure)
+      if: ${{ ! fromJSON(steps.check_approval.outputs.is_approved) }}
       shell: bash
       run: |
-        gh issue edit "$ISSUE_NUMBER" --add-label "request:approved"
-
-        # Remove stale volume:* and status:* labels left from a previous delete cycle
-        stale_labels=$(gh issue view "$ISSUE_NUMBER" --json labels \
-          --jq '[.labels[].name | select(test("^(volume:|status:)"))] | join(",")')
-        if [[ -n "$stale_labels" ]]; then
-          echo "Removing stale labels: $stale_labels"
-          gh issue edit "$ISSUE_NUMBER" --remove-label "$stale_labels"
-        fi
+        echo "::error ::Instance $INSTANCE_NAME management not approved"
+        exit 1
       env:
-        ISSUE_NUMBER: ${{ inputs.issue_number }}
-        GH_TOKEN: ${{ inputs.token }}
-        GH_REPO: ${{ github.repository }}
+        INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
 
     - name: comment (progress)
       id: couc_progress
@@ -79,6 +87,19 @@ runs:
             --jq '[.labels[].name | select(. | startswith("flavor:")) | split(":")[1]][0]'
         )
         echo "instance_flavor=$instance_flavor" >> $GITHUB_OUTPUT
+        
+        # Check if this is a workshop instance by checking expiration time (7 days or less)
+        expiration_days=$(
+          gh issue view $ISSUE_NUMBER \
+            --json labels \
+            --jq '[.labels[].name | select(. | startswith("expiration:")) | split(":")[1] | sub("d$"; "") | tonumber][0] // 999'
+        )
+        if (( $(echo "$expiration_days <= 7" | bc -l) )); then
+          is_workshop="true"
+        else
+          is_workshop="false"
+        fi
+        echo "is_workshop=$is_workshop" >> $GITHUB_OUTPUT
       env:
         GH_TOKEN: ${{ inputs.token }}
         GH_REPO: ${{ github.repository }}
@@ -223,9 +244,6 @@ runs:
         # See "currentExoServerVersion" in exosphere/src/Types/Server.elm
         exoServerVersion=6
 
-        # Inject the runner's SSH public key into cloud-config
-        sed -i "s|{runner-ssh-public-key}|$(cat ~/.ssh/id_ed25519.pub)|g" ./cloud-config
-
         # Update INSTANCE_FAVOR placeholder to ensure current value is passed to ansible
         sed -i 's/INSTANCE_FLAVOR/$INSTANCE_FLAVOR/g' ./cloud-config
 
@@ -234,7 +252,7 @@ runs:
           --security-group "exosphere" \
           --flavor $INSTANCE_FLAVOR \
           --image "Featured-Ubuntu22" \
-          --key-name "murat-key" \
+          --key-name "jcfr" \
           --property "exoGuac={\"v\":1,\"ssh\":true,\"vnc\":true}" \
           --property "exoClientUuid=$exoClientUuid" \
           --property "exoServerVersion=$exoServerVersion" \
@@ -262,7 +280,7 @@ runs:
         source ~/venv/bin/activate
 
         echo "Waiting for instance to reach stable state..."
-
+        
         max_wait_time=60  # Wait up to 60 seconds for status to stabilize
         wait_interval=3
         total_wait_time=0
@@ -270,19 +288,19 @@ runs:
         while [ $total_wait_time -lt $max_wait_time ]; do
             instance_json=$(openstack server show "$INSTANCE_NAME" -f json)
             status=$(echo "$instance_json" | jq -r '.status')
-
+            
             echo "Current status: $status (waited ${total_wait_time}s)"
-
+            
             # Check if reached a stable state (ACTIVE or ERROR)
             if [[ "$status" == "ACTIVE" || "$status" == "ERROR" ]]; then
                 echo "Instance reached stable state: $status"
                 break
             fi
-
+            
             sleep $wait_interval
             total_wait_time=$((total_wait_time + wait_interval))
         done
-
+        
         echo "final_status=$status" >> $GITHUB_OUTPUT
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
@@ -297,17 +315,17 @@ runs:
 
         # Get instance details
         instance_json=$(openstack server show "$INSTANCE_NAME" -f json)
-
+        
         status=$(echo "$instance_json" | jq -r '.status')
         host=$(echo "$instance_json" | jq -r '.["OS-EXT-SRV-ATTR:host"]')
         host_id=$(echo "$instance_json" | jq -r '.hostId')
         addresses=$(echo "$instance_json" | jq -r '.addresses')
-
+        
         echo "status: $status"
         echo "host: $host"
         echo "hostId: $host_id"
         echo "addresses: $addresses"
-
+        
         # Check if this is a capacity error
         # host can be null, "null", or "None" - all indicate no host assigned
         # addresses can be {} or "" when empty
@@ -340,7 +358,7 @@ runs:
       shell: bash
       run: |
         source ~/venv/bin/activate
-
+        
         echo "Deleting failed instance due to capacity error"
         openstack server delete "$INSTANCE_NAME" || echo "Failed to delete instance, it may not exist"
       env:
@@ -357,9 +375,7 @@ runs:
         INSTANCE_FLAVOR: ${{ steps.labels.outputs.instance_flavor }}
 
     - name: Ensure instance is ACTIVE before continuing
-      if:
-        ${{ steps.check_capacity_error.outputs.capacity_error != 'true' &&
-        steps.wait_instance_state.outputs.final_status != 'ACTIVE' }}
+      if: ${{ steps.check_capacity_error.outputs.capacity_error != 'true' && steps.wait_instance_state.outputs.final_status != 'ACTIVE' }}
       shell: bash
       run: |
         echo "::error ::Instance failed to reach ACTIVE state. Current status: $CURRENT_STATUS"
@@ -368,12 +384,7 @@ runs:
         CURRENT_STATUS: ${{ steps.wait_instance_state.outputs.final_status }}
 
     - name: comment (instance creation failed)
-      if:
-        ${{ (steps.create_instance.outcome == 'failure' ||
-        steps.wait_instance_state.outcome == 'failure' ||
-        steps.check_capacity_error.outputs.capacity_error != 'true') &&
-        failure() && steps.check_capacity_error.outputs.capacity_error != 'true'
-        }}
+      if: ${{ (steps.create_instance.outcome == 'failure' || steps.wait_instance_state.outcome == 'failure' || steps.check_capacity_error.outputs.capacity_error != 'true') && failure() && steps.check_capacity_error.outputs.capacity_error != 'true' }}
       uses: peter-evans/create-or-update-comment@v5.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
@@ -642,89 +653,6 @@ runs:
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-    - name: Relocate home directory to persistent volume
-      id: relocate_home_directory
-      shell: bash
-      run: |
-        ssh \
-          -o StrictHostKeyChecking=no \
-          -o UserKnownHostsFile=/dev/null \
-          -o LogLevel=ERROR \
-          exouser@$INSTANCE_IP \
-          'bash -s' << 'EOF'
-        VOLUME_HOME=/media/volume/MyData/home/exouser
-        set -e
-        sudo mkdir -p "$(dirname "$VOLUME_HOME")"
-        sudo chown exouser:exouser "$(dirname "$VOLUME_HOME")"
-
-        if [ ! -d "$VOLUME_HOME" ]; then
-            # First-time create: seed volume home from the freshly provisioned home
-            # Exclude .cache — it will be redirected to the ephemeral root disk
-            sudo rsync -a --exclude='.cache' /home/exouser/ "$VOLUME_HOME/"
-            sudo chmod 700 "$VOLUME_HOME"
-            echo "Home directory copied to volume (first create)"
-        else
-            echo "Existing home directory found on volume — preserving user data"
-
-            # Clean up ephemeral session files from the previous (now-dead) instance.
-            # These carry stale hostnames, PIDs, and X11 cookies that can break
-            # GNOME/VNC on the new instance.
-            sudo rm -f "$VOLUME_HOME/.Xauthority" "$VOLUME_HOME/.ICEauthority"
-            sudo rm -f "$VOLUME_HOME/.vnc/"*.pid "$VOLUME_HOME/.vnc/"*.log
-            sudo rm -rf "$VOLUME_HOME/.cache/sessions"
-            sudo rm -rf "$VOLUME_HOME/.dbus"
-        fi
-
-        # Always refresh SSH authorized_keys from cloud-init
-        # (guards against runner key rotation or accidental user deletion)
-        sudo mkdir -p "$VOLUME_HOME/.ssh"
-        sudo cp /home/exouser/.ssh/authorized_keys "$VOLUME_HOME/.ssh/authorized_keys"
-        sudo chown exouser:exouser "$VOLUME_HOME/.ssh" "$VOLUME_HOME/.ssh/authorized_keys"
-        sudo chmod 700 "$VOLUME_HOME/.ssh"
-        sudo chmod 600 "$VOLUME_HOME/.ssh/authorized_keys"
-
-        # Always refresh VNC password from cloud-init (new password generated each provision).
-        # Without this the volume retains the old password and VNC/Guacamole auth fails.
-        if [ -f /home/exouser/.vnc/passwd ]; then
-          sudo mkdir -p "$VOLUME_HOME/.vnc"
-          sudo cp /home/exouser/.vnc/passwd "$VOLUME_HOME/.vnc/passwd"
-          sudo chown exouser:exouser "$VOLUME_HOME/.vnc/passwd"
-          sudo chmod 600 "$VOLUME_HOME/.vnc/passwd"
-        fi
-
-        # Redirect ~/.cache to the ephemeral root disk so browser/app caches
-        # don't consume the user's persistent volume quota.
-        sudo mkdir -p /var/cache/exouser
-        sudo chown exouser:exouser /var/cache/exouser
-        sudo rm -rf "$VOLUME_HOME/.cache"
-        sudo ln -sfn /var/cache/exouser "$VOLUME_HOME/.cache"
-
-        # Update passwd entry.
-        # usermod may fail if exouser processes are already running (GDM, VNC, etc.),
-        # so fall back to direct /etc/passwd edit.
-        sudo usermod -d "$VOLUME_HOME" exouser 2>/dev/null \
-          || sudo sed -i "s|^\(exouser:[^:]*:[^:]*:[^:]*:[^:]*:\)/home/exouser:|\1${VOLUME_HOME}:|" /etc/passwd
-
-        # Replace original home with symlink (atomic swap to avoid a broken state)
-        sudo mv /home/exouser /home/exouser.bak
-        sudo ln -sfn "$VOLUME_HOME" /home/exouser
-        sudo rm -rf /home/exouser.bak
-        EOF
-      env:
-        INSTANCE_IP: ${{ steps.ip_create.outputs.floating_ip_address }}
-
-    - name: comment (failed to relocate home directory to persistent volume)
-      if: ${{ steps.relocate_home_directory.outcome == 'failure' && failure() }}
-      uses: peter-evans/create-or-update-comment@v5.0.0
-      with:
-        issue-number: ${{ inputs.issue_number }}
-        body: |
-          ### Instance Creation Results ❌
-
-          Failed to relocate `/home/exouser` to `/media/volume/MyData/home/exouser` for instance **${{ steps.define.outputs.instance_name }}**.
-
-          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
     - name: Create Renviron file
       id: create_renviron_file
       shell: bash
@@ -869,3 +797,53 @@ runs:
         setup_instance: ✅
         attach_volume: ✅
         send_email: ⏳
+
+    - name: Send mail
+      id: send_email
+      if: ${{ steps.instance_poll.outputs.status == 'complete' && steps.labels.outputs.is_workshop == 'false' }}
+      uses: ./.github/actions/send-email
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
+        instance_name: ${{ steps.define.outputs.instance_name }}
+        instance_issue_number: ${{ inputs.issue_number }}
+
+    - name: Send workshop mail
+      id: send_workshop_email
+      if: ${{ steps.instance_poll.outputs.status == 'complete' && steps.labels.outputs.is_workshop == 'true' }}
+      uses: ./.github/actions/workshop-send-email
+      with:
+        os_cloud: ${{ inputs.os_cloud }}
+        token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
+        instance_name: ${{ steps.define.outputs.instance_name }}
+        instance_issue_number: ${{ inputs.issue_number }}
+
+    - name: comment (failed to send email)
+      if: ${{ steps.send_email.outcome == 'failure' && failure() }}
+      uses: peter-evans/create-or-update-comment@v5.0.0
+      with:
+        issue-number: ${{ inputs.issue_number }}
+        body: |
+          ### Instance Creation Results ❌
+
+          Failed to send connection email for instance **${{ steps.define.outputs.instance_name }}**. ${{ steps.send_email.outputs.error_message }}
+
+          See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: comment (progress)
+      uses: ./.github/actions/comment-progress
+      with:
+        comment-id: ${{ steps.couc_progress.outputs.comment-id }}
+        create_ip: ✅
+        create_volume: ✅
+        create_instance: ✅
+        associate_ip: ✅
+        setup_instance: ✅
+        attach_volume: ✅
+        send_email: ✅

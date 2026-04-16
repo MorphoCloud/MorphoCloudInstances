@@ -17,18 +17,14 @@ jobs:
       - name: Send mail (admin team mentioned)
         uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
-          server_address: webhost.dynadot.com
-          server_port: 587
-          secure: false
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal <no-reply@morphocloud.org>
+          from: MorphoCloudPortal <morphocloudportal@gmail.com>
           to: ${{ vars.MORPHOCLOUD_GITHUB_ADMIN_EMAILS }}
-          subject:
-            "[${{ github.event.repository.name }}]
-            @MorphoCloud/morphocloud-admins mentioned by @${{
-            github.event.comment.user.login }} in issue #${{
-            github.event.issue.number }}"
+          subject: "[${{ github.event.repository.name }}] @MorphoCloud/morphocloud-admins mentioned by @${{ github.event.comment.user.login }} in issue #${{ github.event.issue.number }}"
           body: |
             @${{ github.event.comment.user.login }} mentioned @MorphoCloud/morphocloud-admins in issue #${{ github.event.issue.number }}.
 

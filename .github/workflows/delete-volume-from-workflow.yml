@@ -32,7 +32,6 @@ on:
 permissions:
   issues: write
   checks: read
-  contents: read
 
 jobs:
   control:

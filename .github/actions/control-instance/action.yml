@@ -22,26 +22,15 @@ inputs:
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
+    required: true
   mail_server_username:
     description: "mail server username"
     required: true
   mail_server_password:
     description: "mail server password"
     required: true
-  email_lookup_url:
-    description: "URL of the Apps Script web app for email lookup"
-    required: true
-  issue_creator:
-    description:
-      "GitHub username of the issue creator (used for email lookup on unshelve)"
-    required: false
-    default: ""
-  roster_sheet_id:
-    description:
-      "Google Sheet ID of the instructor-owned course roster (course repos only;
-      leave blank for individual repos)"
-    required: false
-    default: ""
 runs:
   using: "composite"
   steps:
@@ -399,13 +388,13 @@ runs:
                 host=$(echo "$instance_json" | jq -r '.["OS-EXT-SRV-ATTR:host"]')
                 host_id=$(echo "$instance_json" | jq -r '.hostId')
                 addresses=$(echo "$instance_json" | jq -r '.addresses')
-
+                
                 echo ""
                 echo "Detected ERROR status. Checking capacity error conditions..."
                 echo "host: $host"
                 echo "hostId: $host_id"
                 echo "addresses: $addresses"
-
+                
                 # host can be null, "null", or "None" - all indicate no host assigned
                 # addresses can be {} or "" when empty
                 if [[ ( "$host" == "null" || "$host" == "None" || "$host" == "" ) && "$host_id" == "" && ( "$addresses" == "{}" || "$addresses" == "" ) ]]; then
@@ -439,9 +428,7 @@ runs:
         COMMAND_NAME: ${{ inputs.command_name }}
 
     - name: comment (maximum wait time exceeded)
-      if:
-        ${{ steps.instance_poll.outcome == 'failure' && failure() &&
-        steps.instance_poll.outputs.capacity_error != 'true' }}
+      if: ${{ steps.instance_poll.outcome == 'failure' && failure() && steps.instance_poll.outputs.capacity_error != 'true' }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
@@ -458,10 +445,10 @@ runs:
       shell: bash
       run: |
         source ~/venv/bin/activate
-
+        
         # Try to get flavor from instance
         flavor=$(openstack server show "$INSTANCE_NAME" -f json | jq -r '.flavor' 2>/dev/null || echo "")
-
+        
         # If not available from instance, try to get from issue labels
         if [[ -z "$flavor" || "$flavor" == "null" ]]; then
           flavor=$(
@@ -470,7 +457,7 @@ runs:
               --jq '[.labels[].name | select(. | startswith("flavor:")) | split(":")[1]][0]'
           )
         fi
-
+        
         echo "flavor=$flavor" >> $GITHUB_OUTPUT
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
@@ -498,7 +485,7 @@ runs:
       shell: bash
       run: |
         source ~/venv/bin/activate
-
+        
         echo "Deleting failed instance due to capacity error"
         openstack server delete "$INSTANCE_NAME" || echo "Failed to delete instance, it may not exist"
       env:
@@ -576,50 +563,30 @@ runs:
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-    - name: Send email (individual)
-      id: send_email_individual
+    - name: Send email
+      id: send_email
       if:
-        ${{ steps.check_instance.outputs.exists == 'true' && success() &&
-        inputs.command_name == 'unshelve' && inputs.roster_sheet_id == '' }}
+        ${{ steps.check_instance.outputs.exists == 'true' && success()  &&
+        inputs.command_name == 'unshelve' }}
       uses: ./.github/actions/send-email
       with:
         os_cloud: ${{ inputs.os_cloud }}
         token: ${{ inputs.token }}
-        email_lookup_url: ${{ inputs.email_lookup_url }}
-        issue_creator: ${{ inputs.issue_creator }}
-        mail_server_username: ${{ inputs.mail_server_username }}
-        mail_server_password: ${{ inputs.mail_server_password }}
-        instance_name: ${{ steps.define.outputs.instance_name }}
-        instance_issue_number: ${{ inputs.issue_number }}
-
-    - name: Send email (course)
-      id: send_email_course
-      if:
-        ${{ steps.check_instance.outputs.exists == 'true' && success() &&
-        inputs.command_name == 'unshelve' && inputs.roster_sheet_id != '' }}
-      uses: ./.github/actions/course-send-email
-      with:
-        os_cloud: ${{ inputs.os_cloud }}
-        token: ${{ inputs.token }}
-        email_lookup_url: ${{ inputs.email_lookup_url }}
-        issue_creator: ${{ inputs.issue_creator }}
-        roster_sheet_id: ${{ inputs.roster_sheet_id }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
         mail_server_username: ${{ inputs.mail_server_username }}
         mail_server_password: ${{ inputs.mail_server_password }}
         instance_name: ${{ steps.define.outputs.instance_name }}
         instance_issue_number: ${{ inputs.issue_number }}
 
     - name: comment (failed to send email)
-      if:
-        ${{ (steps.send_email_individual.outcome == 'failure' ||
-        steps.send_email_course.outcome == 'failure') && failure() }}
+      if: ${{ steps.send_email.outcome == 'failure' && failure() }}
       uses: peter-evans/create-or-update-comment@v4.0.0
       with:
         issue-number: ${{ inputs.issue_number }}
         body: |
           ### Command Results ❌
 
-          Failed to send connection email for instance **${{ steps.define.outputs.instance_name }}**. ${{ steps.send_email_individual.outputs.error_message || steps.send_email_course.outputs.error_message }}
+          Failed to send connection email for instance **${{ steps.define.outputs.instance_name }}**. ${{ steps.send_email.outputs.error_message }}
 
           See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -641,6 +608,9 @@ runs:
         command_name: "unapprove"
         instance_name_prefix: ${{ inputs.instance_name_prefix }}
         token: ${{ inputs.token }}
+        string_encryption_key: ${{ inputs.string_encryption_key }}
+        mail_server_username: ${{ inputs.mail_server_username }}
+        mail_server_password: ${{ inputs.mail_server_password }}
 
     - name: Update Request Status Label
       uses: ./.github/actions/update-request-status-label

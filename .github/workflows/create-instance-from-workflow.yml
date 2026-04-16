@@ -7,25 +7,11 @@ on:
         description: "Issue number"
         required: true
         type: number
-      skip_preamble:
-        description:
-          "Skip validation comment and initial commands (for workshop
-          sub-issues)"
-        required: false
-        default: "false"
-        type: string
   workflow_call:
     inputs:
       issue_number:
         description: "Issue number"
         required: true
-        type: string
-      skip_preamble:
-        description:
-          "Skip validation comment and initial commands (for workshop
-          sub-issues)"
-        required: false
-        default: "false"
         type: string
 
 permissions:
@@ -35,21 +21,18 @@ permissions:
 
 jobs:
   call-validate-request:
-    if: ${{ inputs.skip_preamble != 'true' }}
     uses: ./.github/workflows/validate-request.yml
     with:
       issue_number: "${{ inputs.issue_number }}"
     secrets: inherit
 
   call-request-labeler:
-    if: ${{ inputs.skip_preamble != 'true' }}
     uses: ./.github/workflows/request-labeler.yml
     with:
       issue_number: "${{ inputs.issue_number }}"
     secrets: inherit
 
   call-request-initial-comments:
-    if: ${{ inputs.skip_preamble != 'true' }}
     uses: ./.github/workflows/request-initial-comments.yml
     with:
       issue_number: "${{ inputs.issue_number }}"
@@ -61,50 +44,10 @@ jobs:
       - call-validate-request
       - call-request-labeler
       - call-request-initial-comments
-    if: ${{ !failure() && !cancelled() }}
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
-        id: app-token
-        with:
-          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
-          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
-
-      - name: Get issue creator
-        id: issue_meta
-        run: |
-          AUTHOR=$(gh issue view "$ISSUE_NUMBER" --json author --jq '.author.login')
-          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      - name: Check authorization
-        id: check_auth
-        shell: bash
-        run: |
-          LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels 2>/dev/null)
-          is_approved=$(echo "$LABELS_JSON" | jq -e '[.labels[].name] | index("request:approved")' > /dev/null && echo "true" || echo "false")
-          if [[ "$is_approved" != "true" ]]; then
-            echo "::error ::Issue #$ISSUE_NUMBER does not have request:approved label"
-            exit 1
-          fi
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      - name: Check JS2 status
-        id: js2_status
-        uses: ./.github/actions/check-js2-status
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          issue_number: ${{ inputs.issue_number }}
-
       - name: Create instance
-        id: provision
         uses: ./.github/actions/create-instance
         with:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
@@ -112,54 +55,6 @@ jobs:
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           volume_name_suffix: ${{ vars.VOLUME_NAME_PREFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get workshop organizer
-        id: workshop_org
-        if: ${{ steps.provision.outputs.setup_status == 'complete' }}
-        shell: bash
-        run: |
-          ASSIGNEE=$(gh issue view "$ISSUE_NUMBER" --json assignees --jq '.assignees[0].login')
-          echo "username=$ASSIGNEE" >> $GITHUB_OUTPUT
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      - name: Send workshop email
-        id: send_email
-        if: ${{ steps.provision.outputs.setup_status == 'complete' }}
-        uses: ./.github/actions/workshop-send-email
-        with:
-          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          email_lookup_url: ${{ vars.MORPHOCLOUD_WORKSHOP_EMAIL_LOOKUP_URL }}
-          github_username: ${{ steps.workshop_org.outputs.username }}
-          mail_server_username: ${{ secrets.MAIL_USERNAME }}
-          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
-          instance_name: ${{ steps.provision.outputs.instance_name }}
-          instance_issue_number: ${{ inputs.issue_number }}
-
-      - name: comment (failed to send email)
-        if: ${{ steps.send_email.outcome == 'failure' && failure() }}
-        uses: peter-evans/create-or-update-comment@v5.0.0
-        with:
-          issue-number: ${{ inputs.issue_number }}
-          body: |
-            ### Instance Creation Results ❌
-
-            Failed to send connection email for instance **${{ steps.provision.outputs.instance_name }}**. ${{ steps.send_email.outputs.error_message }}
-
-            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: comment (progress)
-        if: ${{ steps.send_email.outcome == 'success' }}
-        uses: ./.github/actions/comment-progress
-        with:
-          comment-id: ${{ steps.provision.outputs.progress_comment_id }}
-          create_ip: ✅
-          create_volume: ✅
-          create_instance: ✅
-          associate_ip: ✅
-          setup_instance: ✅
-          attach_volume: ✅
-          send_email: ✅
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          mail_server_username: ${{secrets.MAIL_USERNAME}}
+          mail_server_password: ${{secrets.MAIL_PASSWORD}}

@@ -155,20 +155,6 @@ runs:
         openstack server remove volume \
           $instance_id \
           $volume_id
-
-        # Poll until volume status is 'available' (detach is asynchronous)
-        for i in $(seq 1 30); do
-          volume_status=$(openstack volume show "$volume_id" -f json | jq -r '.status')
-          echo "volume status [$volume_status] (attempt $i/30)"
-          if [[ "$volume_status" == "available" ]]; then
-            break
-          fi
-          sleep 2
-        done
-        if [[ "$volume_status" != "available" ]]; then
-          echo "::error ::Timed out waiting for volume $volume_id to detach (status: $volume_status)"
-          exit 1
-        fi
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
         INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}

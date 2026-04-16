@@ -1,7 +1,8 @@
 name: Automatic Instance Shelving
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Run every 5 mins
+    - cron: "* * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -147,11 +148,9 @@ jobs:
               echo "Timeout is set to [$timeout_hrs] hours."
 
               # Check uptime and define action
-              # Note: The popup reminder is handled entirely by the instance-side cron
-              # (check-instance-shelve.sh -a every 5 min). GitHub Actions cron is unreliable
-              # for self-hosted runners and can miss narrow time windows, so we shelve as
-              # soon as uptime exceeds the timeout regardless of when the run fires.
-              if $(python3 -c "valid=($uptime_hours > $timeout_hrs); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
+              if $(python3 -c "valid=($uptime_hours > ($timeout_hrs - 0.5) and $uptime_hours <= $timeout_hrs); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
+                action="notify"
+              elif $(python3 -c "valid=($uptime_hours > $timeout_hrs); EXIT_SUCCESS=0; EXIT_FAILURE=1; exit(EXIT_SUCCESS if valid else EXIT_FAILURE)"); then
                 action="shelve"
               else
                 action=""

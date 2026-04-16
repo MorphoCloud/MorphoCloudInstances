@@ -4,8 +4,8 @@ inputs:
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
-  email_lookup_url:
-    description: "Base URL of the Apps Script web app for email lookup"
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
     required: true
   mail_server_username:
     description: "mail server username"
@@ -19,12 +19,35 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Look up organizer email
-      id: lookup_email
-      uses: ./.github/actions/lookup-email
+    - name: Extract fields
+      id: extract
+      uses: ./.github/actions/extract-issue-fields
       with:
-        lookup_url: ${{ inputs.email_lookup_url }}
-        github_username: ${{ github.event.issue.user.login }}
+        token: ${{ inputs.token }}
+        repository: ${{ github.repository }}
+        issue_number: ${{ inputs.workshop_issue_number }}
+
+    - name: Check if email is encoded
+      id: check_email_encryption
+      shell: bash
+      run: |
+        if [[ "$EMAIL" != *"@"* ]]; then
+          encoded="true"
+        else
+          encoded="false"
+        fi
+        echo "encoded=$encoded" >> $GITHUB_OUTPUT
+      env:
+        EMAIL: ${{ steps.extract.outputs.email }}
+
+    - name: Decode email
+      id: decode_email
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "decode"
+        skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
 
     - name: Extract workshop specific fields
       id: extract_workshop
@@ -37,13 +60,13 @@ runs:
     - name: Send approval mail
       uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
       with:
-        server_address: webhost.dynadot.com
-        server_port: 587
-        secure: false
+        server_address: smtp.gmail.com
+        server_port: 465
+        secure: true
         username: ${{ inputs.mail_server_username }}
         password: ${{ inputs.mail_server_password }}
-        from: MorphoCloudPortal <no-reply@morphocloud.org>
-        to: ${{ steps.lookup_email.outputs.email }}
+        from: MorphoCloudPortal
+        to: ${{ steps.decode_email.outputs.output_string }}
         subject:
           "[${{ github.event.repository.name }}] Approval granted for workshop
           #${{ inputs.workshop_issue_number }}"
@@ -55,14 +78,12 @@ runs:
 
           - To initiate the creation of ${{ steps.extract_workshop.outputs.number_of_instances }} instances expected to be running for ${{ steps.extract_workshop.outputs.duration_days }} days, comment `/create` on the issue.
 
-          > **Tip:** We recommend running `/create` approximately **24 hours before your workshop begins** to ensure all instances are ready in time.
-
           _Only one command should be used per comment._
 
-          If you have questions, please contact [portal@morphocloud.org](mailto:portal@morphocloud.org).
+          If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
 
           **Supported Issue Commands:**
 
           _The following commands can be added as comments to issue [${{ github.repository }}#${{ inputs.workshop_issue_number }}](https://github.com/${{ github.repository }}/issues/${{ inputs.workshop_issue_number }}):_
 
-          - `/create`: Initiate the workshop instances
+          - `/create`: Initiate the **${{ steps.extract_workshop.outputs.number_of_instances }}** workshop instances

@@ -13,7 +13,6 @@ on:
 permissions:
   issues: write
   checks: read
-  contents: read
 
 jobs:
   send-renewal-email:
@@ -21,26 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Skip if course instance
-        id: skip_check
-        shell: bash
-        run: |
-          IS_COURSE=$(gh issue view "$ISSUE_NUMBER" --json labels \
-            --jq '[.labels[].name] | index("request-type:course-instance") != null')
-          if [[ "$IS_COURSE" == "true" ]]; then
-            echo "Course instances are not renewable. Skipping renewal email."
-            echo "is_course=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_course=false" >> $GITHUB_OUTPUT
-          fi
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
       - name: Define instance name
         id: define
-        if: ${{ steps.skip_check.outputs.is_course != 'true' }}
         uses: ./.github/actions/define-instance-name
         with:
           prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
@@ -48,16 +29,13 @@ jobs:
 
       - name: Check instance exists
         id: check_instance
-        if: ${{ steps.skip_check.outputs.is_course != 'true' }}
         uses: ./.github/actions/check-instance-exists
         with:
           os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
           instance_name: ${{ steps.define.outputs.instance_name }}
 
       - name: command results comment (Instance does not exist)
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          steps.check_instance.outputs.exists == 'false' }}
+        if: ${{ steps.check_instance.outputs.exists == 'false' }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ inputs.issue_number }}
@@ -68,67 +46,43 @@ jobs:
 
       - name: Define volume name
         id: define_volume_name
-        if: ${{ steps.skip_check.outputs.is_course != 'true' }}
         uses: ./.github/actions/define-volume-name
         with:
           issue_number: ${{ inputs.issue_number }}
           suffix: ${{ vars.VOLUME_NAME_SUFFIX }}
 
-      - name: Get issue metadata
-        id: issue_meta
-        if: ${{ steps.skip_check.outputs.is_course != 'true' }}
+      - name: Extract fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ inputs.issue_number }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
         shell: bash
         run: |
-          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels,author)
-          AUTHOR=$(echo "$ISSUE_JSON" | jq -r '.author.login')
-          IS_WORKSHOP=$(echo "$ISSUE_JSON" | jq -e '[.labels[].name] | index("request-type:workshop")' > /dev/null 2>&1 && echo "true" || echo "false")
-          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
-          echo "is_workshop=$IS_WORKSHOP" >> $GITHUB_OUTPUT
-        env:
-          ISSUE_NUMBER: ${{ inputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
-      # --- Individual path: look up email from Apps Script ---
-      - name: Look up email (individual)
-        id: lookup_email
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          steps.issue_meta.outputs.is_workshop != 'true' }}
-        uses: ./.github/actions/lookup-email
-        with:
-          lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
-          github_username: ${{ steps.issue_meta.outputs.author }}
-
-      # --- Workshop path: look up email from Apps Script ---
-      - name: Look up email (workshop)
-        id: lookup_email_workshop
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          steps.issue_meta.outputs.is_workshop == 'true' }}
-        uses: ./.github/actions/lookup-email
-        with:
-          lookup_url: ${{ vars.MORPHOCLOUD_WORKSHOP_EMAIL_LOOKUP_URL }}
-          github_username: ${{ steps.issue_meta.outputs.author }}
-
-      - name: Resolve email
-        id: resolve_email
-        if: ${{ steps.skip_check.outputs.is_course != 'true' }}
-        shell: bash
-        run: |
-          if [[ "$IS_WORKSHOP" == "true" ]]; then
-            echo "email=$WORKSHOP_EMAIL" >> $GITHUB_OUTPUT
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
           else
-            echo "email=$INDIVIDUAL_EMAIL" >> $GITHUB_OUTPUT
+            encoded="false"
           fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
         env:
-          IS_WORKSHOP: ${{ steps.issue_meta.outputs.is_workshop }}
-          WORKSHOP_EMAIL: ${{ steps.lookup_email_workshop.outputs.email }}
-          INDIVIDUAL_EMAIL: ${{ steps.lookup_email.outputs.email }}
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
 
       - name: Check renewal availability
         id: check_renewal
-        if: ${{ steps.skip_check.outputs.is_course != 'true' }}
         shell: bash
         run: |
           # Retrieve issue labels
@@ -165,18 +119,16 @@ jobs:
 
       - name: Send renewal email (renewal available)
         id: send_email_renewable
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          steps.check_renewal.outputs.renewal_available == 'true' }}
+        if: ${{ steps.check_renewal.outputs.renewal_available == 'true' }}
         uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
-          server_address: webhost.dynadot.com
-          server_port: 587
-          secure: false
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal <no-reply@morphocloud.org>
-          to: ${{ steps.resolve_email.outputs.email }}
+          from: MorphoCloudPortal
+          to: ${{ steps.decode_email.outputs.output_string }}
           subject:
             "[${{ github.event.repository.name }}] Instance ${{
             steps.define.outputs.instance_name }} and Volume ${{
@@ -199,24 +151,22 @@ jobs:
 
             ## ❓ Need Help?
 
-            Contact us at [portal@morphocloud.org](mailto:portal@morphocloud.org) if you have any questions.
+            Contact us at [morphocloud@outlook.com](mailto:morphocloud@outlook.com) if you have any questions.
 
             **⏳ Time is running out! If you wish to keep your instance and volume, comment `/renew` now!**
 
       - name: Send final expiration email (no renewal available)
         id: send_email_final
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          steps.check_renewal.outputs.renewal_available == 'false' }}
+        if: ${{ steps.check_renewal.outputs.renewal_available == 'false' }}
         uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
-          server_address: webhost.dynadot.com
-          server_port: 587
-          secure: false
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal <no-reply@morphocloud.org>
-          to: ${{ steps.resolve_email.outputs.email }}
+          from: MorphoCloudPortal
+          to: ${{ steps.decode_email.outputs.output_string }}
           subject:
             "[${{ github.event.repository.name }}] FINAL NOTICE: Instance ${{
             steps.define.outputs.instance_name }} and Volume ${{
@@ -241,15 +191,12 @@ jobs:
 
             ## ❓ Need Help?
 
-            Contact us at [portal@morphocloud.org](mailto:portal@morphocloud.org) if you have any questions.
+            Contact us at [morphocloud@outlook.com](mailto:morphocloud@outlook.com) if you have any questions.
 
             **⏳ Time is running out! Back up your data now!**
 
       - name: command results comment (failed)
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          (steps.send_email_renewable.outcome == 'failure' ||
-          steps.send_email_final.outcome == 'failure') && failure() }}
+        if: ${{ (steps.send_email_renewable.outcome == 'failure' || steps.send_email_final.outcome == 'failure') && failure() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ inputs.issue_number }}
@@ -259,10 +206,7 @@ jobs:
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: command results comment (success)
-        if:
-          ${{ steps.skip_check.outputs.is_course != 'true' &&
-          (steps.send_email_renewable.outcome == 'success' ||
-          steps.send_email_final.outcome == 'success') && success() }}
+        if: ${{ (steps.send_email_renewable.outcome == 'success' || steps.send_email_final.outcome == 'success') && success() }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           issue-number: ${{ inputs.issue_number }}

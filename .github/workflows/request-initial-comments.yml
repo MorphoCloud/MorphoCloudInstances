@@ -11,11 +11,6 @@ on:
         description: "Issue number"
         required: true
         type: string
-      commands_md_path:
-        description: "Path to the markdown file listing supported issue commands"
-        required: false
-        default: "issue-commands.md"
-        type: string
 
 jobs:
   initial_comments:
@@ -97,5 +92,5 @@ jobs:
         with:
           comment-id: ${{ steps.fc_commands.outputs.comment-id }}
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
-          body-path: "${{ inputs.commands_md_path || 'issue-commands.md' }}"
+          body-path: "issue-commands.md"
           edit-mode: replace

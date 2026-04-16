@@ -5,29 +5,12 @@ inputs:
     description:
       "Name of the OpenStack cloud allocation to select openstack auth settings
       defined in '.config/openstack/clouds.yaml'"
-    required: false
-  os_application_credential_id:
-    description: "OpenStack application credential ID (alternative to os_cloud)"
-  os_application_credential_secret:
-    description:
-      "OpenStack application credential secret (alternative to os_cloud)"
-  os_auth_url:
-    description:
-      "OpenStack identity endpoint URL (required when using app credentials)"
-  os_identity_api_version:
-    description: "OpenStack identity API version"
-    default: "3"
-  os_auth_type:
-    description: "OpenStack auth type"
-    default: "v3applicationcredential"
+    required: true
   token:
     description: "GITHUB_TOKEN or repo scoped PAT"
     required: true
-  email_lookup_url:
-    description: "Base URL of the Apps Script web app for workshop email lookup"
-    required: true
-  github_username:
-    description: "GitHub username of the workshop organizer"
+  string_encryption_key:
+    description: "Encryption key to encode and decode the email address"
     required: true
   mail_server_username:
     description: "mail server username"
@@ -48,24 +31,19 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Look up organizer email
-      id: lookup_email
-      uses: ./.github/actions/lookup-email
+    - name: Extract fields
+      id: extract
+      uses: ./.github/actions/extract-issue-fields
       with:
-        lookup_url: ${{ inputs.email_lookup_url }}
-        github_username: ${{ inputs.github_username }}
+        token: ${{ inputs.token }}
+        repository: ${{ github.repository }}
+        issue_number: ${{ inputs.instance_issue_number }}
 
     - name: Retrieve metadata
       id: instance_metadata
       uses: ./.github/actions/retrieve-metadata
       with:
         os_cloud: ${{ inputs.os_cloud }}
-        os_application_credential_id: ${{ inputs.os_application_credential_id }}
-        os_application_credential_secret:
-          ${{ inputs.os_application_credential_secret }}
-        os_auth_url: ${{ inputs.os_auth_url }}
-        os_identity_api_version: ${{ inputs.os_identity_api_version }}
-        os_auth_type: ${{ inputs.os_auth_type }}
         instance_name: ${{ inputs.instance_name }}
 
     - name: Generate Guacamole Connection URL
@@ -74,16 +52,38 @@ runs:
       with:
         instance_ip: ${{ steps.instance_metadata.outputs.instance_ip }}
 
+    - name: Check if email is encoded
+      id: check_email_encryption
+      shell: bash
+      run: |
+        if [[ "$EMAIL" != *"@"* ]]; then
+          encoded="true"
+        else
+          encoded="false"
+        fi
+        echo "encoded=$encoded" >> $GITHUB_OUTPUT
+      env:
+        EMAIL: ${{ steps.extract.outputs.email }}
+
+    - name: Decode email
+      id: decode_email
+      uses: ./.github/actions/encode-decode-string
+      with:
+        input_string: ${{ steps.extract.outputs.email }}
+        encryption_key: ${{ inputs.string_encryption_key }}
+        operation: "decode"
+        skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
     - name: Send mail
       uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
       with:
-        server_address: webhost.dynadot.com
-        server_port: 587
-        secure: false
+        server_address: smtp.gmail.com
+        server_port: 465
+        secure: true
         username: ${{ inputs.mail_server_username }}
         password: ${{ inputs.mail_server_password }}
-        from: MorphoCloudPortal <no-reply@morphocloud.org>
-        to: ${{ steps.lookup_email.outputs.email }}
+        from: MorphoCloudPortal
+        to: ${{ steps.decode_email.outputs.output_string }}
         subject:
           "[${{ github.event.repository.name }}] Workshop Instance ${{
           inputs.instance_name }} active"
@@ -96,7 +96,7 @@ runs:
 
           In both cases, username is **exouser** and the passphrase is provided.
 
-          If you have questions, please contact [portal@morphocloud.org](mailto:portal@morphocloud.org).
+          If you have questions, please contact [morphocloud@outlook.com](mailto:morphocloud@outlook.com).
 
           **Connection Methods:**
 

@@ -5,21 +5,7 @@ inputs:
     description:
       "Name of the OpenStack cloud allocation to select openstack auth settings
       defined in '.config/openstack/clouds.yaml'"
-    required: false
-  os_application_credential_id:
-    description: "OpenStack application credential ID (alternative to os_cloud)"
-  os_application_credential_secret:
-    description:
-      "OpenStack application credential secret (alternative to os_cloud)"
-  os_auth_url:
-    description:
-      "OpenStack identity endpoint URL (required when using app credentials)"
-  os_identity_api_version:
-    description: "OpenStack identity API version"
-    default: "3"
-  os_auth_type:
-    description: "OpenStack auth type"
-    default: "v3applicationcredential"
+    required: true
   instance_name:
     description: "Name of the instance to retrieve metadata from"
     required: true
@@ -90,10 +76,4 @@ runs:
         echo "instance_pwd=$instance_pwd" >> $GITHUB_OUTPUT
       env:
         OS_CLOUD: ${{ inputs.os_cloud }}
-        OS_APPLICATION_CREDENTIAL_ID: ${{ inputs.os_application_credential_id }}
-        OS_APPLICATION_CREDENTIAL_SECRET:
-          ${{ inputs.os_application_credential_secret }}
-        OS_AUTH_URL: ${{ inputs.os_auth_url }}
-        OS_IDENTITY_API_VERSION: ${{ inputs.os_identity_api_version }}
-        OS_AUTH_TYPE: ${{ inputs.os_auth_type }}
         INSTANCE_NAME: ${{ inputs.instance_name }}

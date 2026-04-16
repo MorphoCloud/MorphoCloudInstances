@@ -16,18 +16,6 @@ on:
         description: "Whether to unapprove after deleting the instance"
         type: boolean
         default: false
-      issue_creator:
-        description: "GitHub username of the issue creator (for unshelve email)"
-        required: false
-        type: string
-        default: ""
-      roster_sheet_id:
-        description:
-          "Google Sheet ID of the course roster (leave blank for individual
-          repos)"
-        required: false
-        type: string
-        default: ""
   workflow_call:
     inputs:
       issue_number:
@@ -43,21 +31,8 @@ on:
         description: "Whether to unapprove after deleting the instance"
         type: boolean
         default: false
-      issue_creator:
-        description: "GitHub username of the issue creator (for unshelve email)"
-        required: false
-        type: string
-        default: ""
-      roster_sheet_id:
-        description:
-          "Google Sheet ID of the course roster (leave blank for individual
-          repos)"
-        required: false
-        type: string
-        default: ""
 permissions:
   issues: write
-  contents: read
   checks: read
 
 jobs:
@@ -75,8 +50,6 @@ jobs:
           unapprove_after_delete: ${{ inputs.unapprove_after_delete }}
           instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          email_lookup_url: ${{ vars.MORPHOCLOUD_EMAIL_LOOKUP_URL }}
-          issue_creator: ${{ inputs.issue_creator }}
-          roster_sheet_id: ${{ inputs.roster_sheet_id }}
+          string_encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
           mail_server_username: ${{secrets.MAIL_USERNAME}}
           mail_server_password: ${{secrets.MAIL_PASSWORD}}

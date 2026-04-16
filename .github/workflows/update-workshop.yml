@@ -52,23 +52,35 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Get issue author
-        id: get_author
+      - name: Extract common fields
+        id: extract
+        uses: ./.github/actions/extract-issue-fields
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue_number: ${{ matrix.issue_number }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
         shell: bash
         run: |
-          AUTHOR=$(gh issue view "$ISSUE_NUMBER" --json author --jq '.author.login')
-          echo "author=$AUTHOR" >> "$GITHUB_OUTPUT"
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
         env:
-          ISSUE_NUMBER: ${{ matrix.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+          EMAIL: ${{ steps.extract.outputs.email }}
 
-      - name: Look up organizer email
-        id: lookup_email
-        uses: ./.github/actions/lookup-email
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
         with:
-          lookup_url: ${{ vars.MORPHOCLOUD_WORKSHOP_EMAIL_LOOKUP_URL }}
-          github_username: ${{ steps.get_author.outputs.author }}
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
 
       - name: Extract workshop fields
         id: extract_workshop
@@ -179,13 +191,13 @@ jobs:
         if: ${{ steps.readiness.outputs.ready == 'true' }}
         uses: dawidd6/action-send-mail@62a2d05b79935ad4fb90ce9079928099579c14ac # v9
         with:
-          server_address: webhost.dynadot.com
-          server_port: 587
-          secure: false
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: MorphoCloudPortal <no-reply@morphocloud.org>
-          to: ${{ steps.lookup_email.outputs.email }}
+          from: MorphoCloudPortal
+          to: ${{ steps.decode_email.outputs.output_string }}
           subject:
             "[${{ github.event.repository.name }}] Workshop #${{
             matrix.issue_number }} instances ready"

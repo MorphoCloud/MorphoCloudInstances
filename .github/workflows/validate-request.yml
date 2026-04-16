@@ -20,7 +20,6 @@ on:
 permissions:
   issues: write
   checks: read
-  contents: read
 
 jobs:
   validate:
@@ -49,17 +48,6 @@ jobs:
 
       - uses: actions/checkout@v6
 
-      - name: Determine request type
-        id: request_type
-        run: |
-          LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels)
-          is_workshop=$(echo "$LABELS_JSON" | jq -e '[.labels[].name] | index("request-type:workshop")' > /dev/null 2>&1 && echo "true" || echo "false")
-          echo "is_workshop=$is_workshop" >> $GITHUB_OUTPUT
-        env:
-          ISSUE_NUMBER: ${{ steps.collect_inputs.outputs.issue_number }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-
       - name: Extract fields
         id: extract
         uses: ./.github/actions/extract-issue-fields
@@ -68,7 +56,136 @@ jobs:
           repository: ${{ github.repository }}
           issue_number: ${{ steps.collect_inputs.outputs.issue_number }}
 
-      # --- Validation result comments ---
+      - name: Check ORCID iD format
+        id: check_orcid_format
+        run: |
+          if [[ "$ORCID" =~ ^([0-9]{4}-){3}[0-9]{3}([0-9]|X)$ ]]; then
+            valid="true"
+            emoji="✅"
+          else
+            valid="false"
+            emoji="❌"
+          fi
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
+        env:
+          ORCID: ${{ steps.extract.outputs.orcid }}
+
+      - name: Check if email is encoded
+        id: check_email_encryption
+        run: |
+          if [[ "$EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.extract.outputs.email }}
+
+      - name: Decode email
+        id: decode_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip: ${{ steps.check_email_encryption.outputs.encoded == 'false' }}
+
+      - name: Check email format
+        id: check_email_format
+        run: |
+          # Adapted from https://gist.github.com/guessi/82a73ee7eb2b1216eb9db17bb8d65dd1
+          email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
+          if [[ "$EMAIL" =~ $email_regex ]]; then
+            valid="true"
+            emoji="✅"
+          else
+            valid="false"
+            emoji="❌"
+          fi
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.decode_email.outputs.output_string }}
+
+      - name: Check if confirm email is encoded
+        id: check_confirm_email_encryption
+        run: |
+          if [[ "$CONFIRM_EMAIL" != *"@"* ]]; then
+            encoded="true"
+          else
+            encoded="false"
+          fi
+          echo "encoded=$encoded" >> $GITHUB_OUTPUT
+        env:
+          CONFIRM_EMAIL: ${{ steps.extract.outputs.confirm_email }}
+
+      - name: Decode confirm email
+        id: decode_confirm_email
+        uses: ./.github/actions/encode-decode-string
+        with:
+          input_string: ${{ steps.extract.outputs.confirm_email }}
+          encryption_key: ${{ secrets.STRING_ENCRYPTION_KEY }}
+          operation: "decode"
+          skip:
+            ${{ steps.check_confirm_email_encryption.outputs.encoded == 'false'
+            }}
+
+      - name: Check confirm email format
+        id: check_confirm_email_format
+        run: |
+          # Adapted from https://gist.github.com/guessi/82a73ee7eb2b1216eb9db17bb8d65dd1
+          email_regex="^(([A-Za-z0-9]+((\.|\-|\_|\+)?[A-Za-z0-9]?)*[A-Za-z0-9]+)|[A-Za-z0-9]+)@(([A-Za-z0-9]+)+((\.|\-|\_)?([A-Za-z0-9]+)+)*)+\.([A-Za-z]{2,})+$"
+          if [[ "$CONFIRM_EMAIL" =~ $email_regex ]]; then
+            valid="true"
+            emoji="✅"
+          else
+            valid="false"
+            emoji="❌"
+          fi
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
+        env:
+          CONFIRM_EMAIL: ${{ steps.decode_confirm_email.outputs.output_string }}
+
+      - name: Check emails match
+        id: check_emails_match
+        run: |
+          if [[ "$EMAIL" == "$CONFIRM_EMAIL" ]]; then
+            valid="true"
+            emoji="✅"
+          else
+            valid="false"
+            emoji="❌"
+          fi
+          echo "valid=$valid" >> $GITHUB_OUTPUT
+          echo "emoji=$emoji" >> $GITHUB_OUTPUT
+        env:
+          EMAIL: ${{ steps.decode_email.outputs.output_string }}
+          CONFIRM_EMAIL: ${{ steps.decode_confirm_email.outputs.output_string }}
+
+      - uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        id: app-token
+        with:
+          app-id: ${{ vars.MORPHOCLOUD_WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.MORPHOCLOUD_WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Encode emails
+        id: encode_emails
+        if:
+          ${{ success() && steps.check_email_encryption.outputs.encoded ==
+          'false' && steps.check_email_format.outputs.valid == 'true' &&
+          steps.check_confirm_email_format.outputs.valid == 'true' &&
+          steps.check_emails_match.outputs.valid == 'true' }}
+        run: |
+          gh workflow run update-issue-from-workflow.yml \
+            -f issue_number=$ISSUE_NUMBER \
+            -f command_name=$COMMAND_NAME
+        env:
+          ISSUE_NUMBER: ${{ steps.collect_inputs.outputs.issue_number }}
+          COMMAND_NAME: encode_email
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: find command results comment
         uses: peter-evans/find-comment@v4
@@ -76,18 +193,6 @@ jobs:
         with:
           issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
           body-includes: "### Validation Results"
-
-      - name: command results comment (instance - success)
-        if: ${{ steps.request_type.outputs.is_workshop != 'true' && success() }}
-        uses: peter-evans/create-or-update-comment@v5.0.0
-        with:
-          comment-id: ${{ steps.fc.outputs.comment-id }}
-          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
-          edit-mode: replace
-          body: |
-            ### Validation Results
-
-            ✅ Instance request validated. You may now use `/create` to provision your instance.
 
       - name: command results comment (failure)
         if: ${{ failure() }}
@@ -103,8 +208,12 @@ jobs:
 
             See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: command results comment (workshop - success)
-        if: ${{ steps.request_type.outputs.is_workshop == 'true' && success() }}
+      - name: command results comment (status)
+        if:
+          ${{ success() && (steps.check_orcid_format.outputs.valid == 'true' &&
+          steps.check_email_format.outputs.valid == 'true' &&
+          steps.check_confirm_email_format.outputs.valid == 'true' &&
+          steps.check_emails_match.outputs.valid == 'true') }}
         uses: peter-evans/create-or-update-comment@v5.0.0
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
@@ -113,4 +222,38 @@ jobs:
           body: |
             ### Validation Results
 
-            ✅ Workshop request validated. An administrator will review your request. You will **automatically receive an email** once it has been approved — no further action is needed until then.
+            The validation checks have completed. Below is the status of each check:
+
+            | Check                   | ORCID iD format                                | Email format                                   | Confirm Email format                                   | Emails match                                   |
+            | ----------------------- |:----------------------------------------------:|:----------------------------------------------:|:------------------------------------------------------:|:----------------------------------------------:|
+            | Status                  | ${{ steps.check_orcid_format.outputs.emoji }}  | ${{ steps.check_email_format.outputs.emoji }}  | ${{ steps.check_confirm_email_format.outputs.emoji }}  | ${{ steps.check_emails_match.outputs.emoji }}  |
+
+      - name: command results comment (status)
+        if:
+          ${{ success() && (steps.check_orcid_format.outputs.valid == 'false' ||
+          steps.check_email_format.outputs.valid == 'false' ||
+          steps.check_confirm_email_format.outputs.valid == 'false' ||
+          steps.check_emails_match.outputs.valid == 'false') }}
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ steps.collect_inputs.outputs.issue_number }}
+          edit-mode: replace
+          body: |
+            ### Validation Results
+
+            The validation checks have completed. Below is the status of each check:
+
+            | Check                   | ORCID iD format                                | Email format                                   | Confirm Email format                                   | Emails match                                   |
+            | ----------------------- |:----------------------------------------------:|:----------------------------------------------:|:------------------------------------------------------:|:----------------------------------------------:|
+            | Status                  | ${{ steps.check_orcid_format.outputs.emoji }}  | ${{ steps.check_email_format.outputs.emoji }}  | ${{ steps.check_confirm_email_format.outputs.emoji }}  | ${{ steps.check_emails_match.outputs.emoji }}  |
+
+            > [!IMPORTANT]
+            > If the ORCID iD format is incorrect, edit the issue description to correct it.
+            >
+            > If either email format is invalid or the emails do not match, please update the issue description accordingly.
+
+            > [!TIP]
+            > Once the emails are correctly formatted and match, they will be automatically obfuscated for security.
+
+            See details [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).

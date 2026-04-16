@@ -1,0 +1,159 @@
+name: Instructor Access
+
+on:
+  issue_comment:
+    types: [created]
+
+# Permissions needed for reacting to IssueOps commands on issues
+permissions:
+  issues: write
+  checks: read
+  contents: read
+
+jobs:
+  instructor-access:
+    runs-on: self-hosted
+    if:
+      ${{ !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'request-type:course-instance')
+      && ( contains(github.event.comment.body, '/instructor_access') ) }}
+    steps:
+      - name: instructor_access command
+        id: instructor_access_command
+        uses: github/command@v2.0.3
+        with:
+          command: "/instructor_access"
+          reaction: "rocket"
+          allowed_contexts: "issue"
+          permissions: "read,triage,write,maintain,admin"
+          allowlist: "${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}"
+
+      - uses: actions/checkout@v6
+
+      - name: Check instructor authorization
+        id: check_auth
+        if: ${{ steps.instructor_access_command.outputs.continue == 'true' }}
+        shell: bash
+        run: |
+          # Admin bypass — admins may always use this command
+          if echo ",$ADMINS," | grep -q ",$COMMENTER,"; then
+            echo "Admin $COMMENTER — skipping instructor check."
+            exit 0
+          fi
+
+          if [[ "$COMMENTER" == "$COURSE_INSTRUCTOR_GITHUB" ]]; then
+            echo "Commenter $COMMENTER is the course instructor."
+            exit 0
+          fi
+
+          gh issue comment "$ISSUE_NUMBER" --body "### Command Results ❌
+
+          \`/instructor_access\` requires **instructor** or **admin** access. @${COMMENTER} is not authorized."
+          echo "::error ::User $COMMENTER is not authorized for /instructor_access"
+          exit 1
+        env:
+          COMMENTER: ${{ github.event.comment.user.login }}
+          ADMINS: ${{ vars.MORPHOCLOUD_GITHUB_ADMINS }}
+          COURSE_INSTRUCTOR_GITHUB: ${{ vars.COURSE_INSTRUCTOR_GITHUB }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Define instance name
+        id: define
+        if: ${{ steps.instructor_access_command.outputs.continue == 'true' }}
+        uses: ./.github/actions/define-instance-name
+        with:
+          prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          issue_number: ${{ github.event.issue.number }}
+
+      - name: Check instance status
+        id: check_status
+        if: ${{ steps.instructor_access_command.outputs.continue == 'true' }}
+        shell: bash
+        run: |
+          source ~/venv/bin/activate
+          STATUS=$(openstack server show "$INSTANCE_NAME" --format value -c status 2>/dev/null || echo "NOT_FOUND")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+        env:
+          OS_CLOUD: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          INSTANCE_NAME: ${{ steps.define.outputs.instance_name }}
+
+      - name: comment (instance not found)
+        if:
+          ${{ steps.instructor_access_command.outputs.continue == 'true' &&
+          steps.check_status.outputs.status == 'NOT_FOUND' }}
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `/instructor_access` failed: **${{ steps.define.outputs.instance_name }}** does not exist. The student may need to run `/create` first.
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: fail (instance not found)
+        if:
+          ${{ steps.instructor_access_command.outputs.continue == 'true' &&
+          steps.check_status.outputs.status == 'NOT_FOUND' }}
+        shell: bash
+        run: exit 1
+
+      - name: Unshelve instance (if shelved)
+        id: unshelve
+        if:
+          ${{ steps.instructor_access_command.outputs.continue == 'true' &&
+          (steps.check_status.outputs.status == 'SHELVED_OFFLOADED' ||
+          steps.check_status.outputs.status == 'SHELVED') }}
+        uses: ./.github/actions/control-instance
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          issue_number: ${{ github.event.issue.number }}
+          command_name: unshelve
+          instance_name_prefix: ${{ vars.INSTANCE_NAME_PREFIX }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          mail_server_username: ${{ secrets.MAIL_USERNAME }}
+          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
+
+      - name: Send credentials to instructor
+        id: send_instructor_email
+        if:
+          ${{ steps.instructor_access_command.outputs.continue == 'true' &&
+          steps.check_status.outputs.status != 'NOT_FOUND' &&
+          (steps.unshelve.outcome == 'success' || steps.unshelve.outcome ==
+          'skipped') }}
+        uses: ./.github/actions/course-send-email
+        with:
+          os_cloud: ${{ vars.MORPHOCLOUD_OS_CLOUD }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          email_lookup_url: ${{ vars.MORPHOCLOUD_COURSE_INSTRUCTOR_LOOKUP_URL }}
+          issue_creator: ${{ github.event.comment.user.login }}
+          mail_server_username: ${{ secrets.MAIL_USERNAME }}
+          mail_server_password: ${{ secrets.MAIL_PASSWORD }}
+          instance_name: ${{ steps.define.outputs.instance_name }}
+          instance_issue_number: ${{ github.event.issue.number }}
+
+      - name: command results comment (failed)
+        if:
+          ${{ (steps.unshelve.outcome == 'failure' ||
+          steps.send_instructor_email.outcome == 'failure') && failure() }}
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            ### Command Results ❌
+
+            `/instructor_access` failed for **${{ steps.define.outputs.instance_name }}**. ${{ steps.send_instructor_email.outputs.error_message }}
+
+            See details at https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: command results comment (success)
+        if: ${{ steps.send_instructor_email.outcome == 'success' && success() }}
+        uses: peter-evans/create-or-update-comment@v5.0.0
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            `/instructor_access` completed for **${{ steps.define.outputs.instance_name }}** ✅
+
+            Connection credentials have been sent to @${{ github.event.comment.user.login }}'s registered email.
